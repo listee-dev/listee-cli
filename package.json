@@ -6,12 +6,12 @@
     "listee": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc -b",
-    "dev": "npm run watch",
-    "watch": "tsc --watch --preserveWatchOutput",
+    "build": "bun x tsc -b",
+    "dev": "bun run watch",
+    "watch": "bun x tsc --watch --preserveWatchOutput",
     "start": "node dist/index.js",
-    "lint": "npx biome ci .",
-    "test": "npm run build"
+    "lint": "bun x biome ci .",
+    "test": "bun test"
   },
   "dependencies": {
     "@napi-rs/keyring": "^1.2.0",
@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",
+    "@types/bun": "^1.2.23",
     "@types/node": "^20.14.2",
     "typescript": "^5.9.2"
   }

@@ -21,5 +21,8 @@
     "formatter": {
       "quoteStyle": "double"
     }
+  },
+  "files": {
+    "includes": ["src/**"]
   }
 }
