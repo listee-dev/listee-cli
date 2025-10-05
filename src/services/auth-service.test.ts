@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { type AccessTokenResult, ensureSupabaseConfig } from "./authService.js";
+import { type AccessTokenResult, ensureSupabaseConfig } from "./auth-service.js";
 
 const ORIGINAL_ENV = { ...process.env };
 

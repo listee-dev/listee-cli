@@ -47,7 +47,7 @@ listee auth logout
 src/
   index.ts          # CLI entrypoint (Commander wiring)
   commands/auth.ts  # Auth subcommands
-  services/authService.ts
+  services/auth-service.ts
 AGENTS.md           # Agent-specific automation guidelines
 ```
 

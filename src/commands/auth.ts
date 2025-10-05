@@ -8,7 +8,7 @@ import {
   logout,
   signup,
   status,
-} from "../services/authService.js";
+} from "../services/auth-service.js";
 import type {
   AuthStatus,
   EmailOption,
