@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { type AccessTokenResult, ensureSupabaseConfig } from "./auth-service.js";
+import { Buffer } from "node:buffer";
+import {
+  type AccessTokenResult,
+  ensureSupabaseConfig,
+  parseSignupFragment,
+} from "./auth-service.js";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -54,4 +59,32 @@ it("allows constructing AccessTokenResult shape", () => {
     tokenType: "bearer",
   };
   expect(sample.tokenType).toBe("bearer");
+});
+
+describe("parseSignupFragment", () => {
+  const encodeSegment = (value: string): string => {
+    return Buffer.from(value, "utf8").toString("base64url");
+  };
+
+  const header = encodeSegment(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = encodeSegment(JSON.stringify({ email: "user@example.com" }));
+  const signature = encodeSegment("signature");
+  const accessToken = `${header}.${payload}.${signature}`;
+
+  it("parses tokens from a confirmation fragment", () => {
+    const fragment = `#access_token=${accessToken}&refresh_token=refresh123&expires_in=3600&token_type=bearer&type=signup`;
+    const result = parseSignupFragment(fragment);
+
+    expect(result.account).toBe("user@example.com");
+    expect(result.refreshToken).toBe("refresh123");
+    expect(result.expiresIn).toBe(3600);
+  });
+
+  it("throws when fragment is missing required parameters", () => {
+    const fragment = "#token_type=bearer";
+
+    expect(() => {
+      parseSignupFragment(fragment);
+    }).toThrow("Confirmation URL is missing access_token.");
+  });
 });

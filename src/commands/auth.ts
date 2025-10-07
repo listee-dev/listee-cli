@@ -1,8 +1,10 @@
 import type { Buffer } from "node:buffer";
+import { createServer } from "node:http";
 import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "node:readline";
 import type { Command } from "commander";
 import {
+  completeSignupFromFragment,
   ensureSupabaseConfig,
   login,
   logout,
@@ -13,6 +15,7 @@ import type {
   AuthStatus,
   EmailOption,
   RawModeCapableInput,
+  SignupRedirect,
 } from "../types/auth.js";
 
 const ensureNonEmpty = (value: string, label: string): string => {
@@ -38,6 +41,152 @@ const handleError = (error: unknown): void => {
     console.error("Unknown error occurred.");
   }
   process.exitCode = 1;
+};
+
+const LOOPBACK_HOST = "127.0.0.1";
+const LOOPBACK_TIMEOUT_MS = 5 * 60 * 1000;
+
+type LoopbackServer = {
+  redirectUrl: string;
+  waitForConfirmation: () => Promise<SignupRedirect>;
+  shutdown: () => Promise<void>;
+};
+
+const successPage = (message: string): string => {
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Listee CLI Signup</title>
+    <style>
+      body { font-family: sans-serif; margin: 3rem; color: #111; }
+    </style>
+  </head>
+  <body>
+    <h1>${message}</h1>
+    <p>This window is part of the Listee CLI signup flow.</p>
+    <p>You may close this window and return to your terminal.</p>
+  </body>
+</html>`;
+};
+
+const callbackPage = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Completing Signup</title>
+    <style>
+      body { font-family: sans-serif; margin: 3rem; color: #111; }
+    </style>
+  </head>
+  <body>
+    <h1>Completing signup...</h1>
+    <p>This window is part of the Listee CLI signup flow and will update automatically.</p>
+    <script>
+      (async () => {
+        const response = await fetch("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hash: window.location.hash })
+        });
+        const text = await response.text();
+        document.body.innerHTML = text;
+      })().catch((error) => {
+        document.body.innerHTML = "<p>Failed to complete signup: " + error + ". You can close this window.</p>";
+      });
+    </script>
+  </body>
+</html>`;
+
+const startLoopbackServer = async (): Promise<LoopbackServer> => {
+  let resolveResult: ((value: SignupRedirect) => void) | undefined;
+  let rejectResult: ((reason?: unknown) => void) | undefined;
+  let settled = false;
+
+  const server = createServer((req, res) => {
+    const finish = (status: number, body: string, contentType = "text/html"): void => {
+      res.writeHead(status, { "Content-Type": contentType });
+      res.end(body);
+    };
+
+    if (req.method === "GET" && req.url?.startsWith("/callback")) {
+      finish(200, callbackPage);
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/token") {
+      let data = "";
+      req.on("data", (chunk) => {
+        data += chunk.toString();
+      });
+      req.on("end", async () => {
+        if (settled) {
+          finish(200, successPage("Signup already completed."));
+          return;
+        }
+        try {
+          const parsed = JSON.parse(data) as { hash?: string };
+          const hash = parsed.hash;
+          if (typeof hash !== "string" || hash.length === 0) {
+            throw new Error("Missing hash in request body.");
+          }
+          const result = await completeSignupFromFragment(hash);
+          settled = true;
+          finish(200, successPage("Signup confirmed."));
+          resolveResult?.(result);
+        } catch (error) {
+          finish(400, successPage(`Failed to complete signup: ${error instanceof Error ? error.message : String(error)}`));
+          rejectResult?.(error);
+        }
+      });
+      return;
+    }
+
+    finish(404, "Not Found", "text/plain");
+  });
+
+  const waitForConfirmation = new Promise<SignupRedirect>((resolve, reject) => {
+    resolveResult = resolve;
+    rejectResult = reject;
+  });
+
+  server.on("error", (error) => {
+    if (!settled) {
+      settled = true;
+      rejectResult?.(error);
+    }
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, LOOPBACK_HOST, () => resolve());
+  });
+
+  const address = server.address();
+  if (address === null || typeof address !== "object" || address.port === undefined) {
+    server.close();
+    throw new Error("Failed to determine loopback server port.");
+  }
+
+  const timeout = setTimeout(() => {
+    if (!settled) {
+      settled = true;
+      rejectResult?.(new Error("Signup confirmation timed out."));
+    }
+    void server.close();
+  }, LOOPBACK_TIMEOUT_MS);
+
+  const shutdown = async (): Promise<void> => {
+    clearTimeout(timeout);
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+  };
+
+  return {
+    redirectUrl: `http://${LOOPBACK_HOST}:${address.port}/callback`,
+    waitForConfirmation: () => waitForConfirmation.finally(() => clearTimeout(timeout)),
+    shutdown,
+  };
 };
 
 const isRawModeCapable = (
@@ -156,8 +305,28 @@ const signupAction = async (options: EmailOption): Promise<void> => {
   ensureSupabaseConfig();
   const email = ensureEmail(options.email);
   const password = await promptHiddenInput("Password: ");
-  await signup(email, password);
-  console.log("📩 Confirmation email sent.");
+  const loopback = await startLoopbackServer();
+
+  const handleAbort = (): void => {
+    void loopback.shutdown().finally(() => {
+      console.log("\nSignup confirmation cancelled.");
+      process.exit(1);
+    });
+  };
+
+  process.once("SIGINT", handleAbort);
+  process.once("SIGTERM", handleAbort);
+
+  try {
+    await signup(email, password, loopback.redirectUrl);
+    console.log("📩 Confirmation email sent. Keep this terminal open while you click the link.");
+    const result = await loopback.waitForConfirmation();
+    console.log(`✅ Signup confirmed for ${result.account}.`);
+  } finally {
+    process.removeListener("SIGINT", handleAbort);
+    process.removeListener("SIGTERM", handleAbort);
+    await loopback.shutdown();
+  }
 };
 
 const logoutAction = async (): Promise<void> => {

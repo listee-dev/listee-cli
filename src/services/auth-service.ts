@@ -1,13 +1,15 @@
+import { Buffer } from "node:buffer";
 import { AsyncEntry, findCredentials } from "@napi-rs/keyring";
 import type {
   AccessTokenResult,
   AuthStatus,
+  SignupRedirect,
   StoredCredential,
   SupabaseErrorPayload,
   SupabaseTokenResponse,
 } from "../types/auth.js";
 
-export type { AccessTokenResult, AuthStatus } from "../types/auth.js";
+export type { AccessTokenResult, AuthStatus, SignupRedirect } from "../types/auth.js";
 
 const DEFAULT_SERVICE_NAME = "listee-cli";
 
@@ -166,6 +168,99 @@ const buildSupabaseHeaders = (): Record<string, string> => {
   };
 };
 
+const getFragmentParams = (fragment: string): URLSearchParams => {
+  if (fragment.length === 0) {
+    throw new Error("Confirmation URL does not include hash parameters.");
+  }
+
+  if (fragment.startsWith("#")) {
+    return new URLSearchParams(fragment.slice(1));
+  }
+
+  return new URLSearchParams(fragment);
+};
+
+const decodeJwtPayload = (token: string): unknown => {
+  const segments = token.split(".");
+  if (segments.length < 2) {
+    throw new Error("Malformed access token received.");
+  }
+
+  try {
+    const payloadSegment = segments[1];
+    const decoded = Buffer.from(payloadSegment, "base64url").toString("utf8");
+    return JSON.parse(decoded);
+  } catch (error) {
+    throw new Error(
+      `Unable to decode access token payload: ${toErrorMessage(error)}`,
+    );
+  }
+};
+
+const extractEmailFromAccessToken = (token: string): string => {
+  const payload = decodeJwtPayload(token);
+  if (!isRecord(payload)) {
+    throw new Error("Access token payload structure is invalid.");
+  }
+
+  const email = payload.email;
+  if (!isString(email) || email.trim().length === 0) {
+    throw new Error("Access token payload did not include an email.");
+  }
+
+  return email.trim();
+};
+
+const parseIntegerParam = (value: string | null, name: string): number => {
+  if (value === null) {
+    throw new Error(`Missing ${name} in confirmation URL.`);
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`Invalid ${name} value in confirmation URL.`);
+  }
+
+  return parsed;
+};
+
+const parseSignupFromParams = (params: URLSearchParams): SignupRedirect => {
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+  const tokenType = params.get("token_type");
+  const expiresInRaw = params.get("expires_in");
+  const flowType = params.get("type");
+
+  if (!isString(accessToken) || accessToken.length === 0) {
+    throw new Error("Confirmation URL is missing access_token.");
+  }
+  if (!isString(refreshToken) || refreshToken.length === 0) {
+    throw new Error("Confirmation URL is missing refresh_token.");
+  }
+  if (!isString(tokenType) || tokenType.length === 0) {
+    throw new Error("Confirmation URL is missing token_type.");
+  }
+  if (flowType !== "signup") {
+    throw new Error("Confirmation URL is not for a signup flow.");
+  }
+
+  const account = extractEmailFromAccessToken(accessToken);
+  const expiresIn = parseIntegerParam(expiresInRaw, "expires_in");
+
+  return {
+    account,
+    accessToken,
+    refreshToken,
+    tokenType,
+    expiresIn,
+  };
+};
+
+export const parseSignupFragment = (fragment: string): SignupRedirect => {
+  const params = getFragmentParams(fragment);
+  return parseSignupFromParams(params);
+};
+
 const storeRefreshToken = async (
   account: string,
   token: string,
@@ -228,8 +323,12 @@ const requestSupabase = async (
 export const signup = async (
   email: string,
   password: string,
+  redirectUrl?: string,
 ): Promise<void> => {
-  const response = await requestSupabase("auth/v1/signup", { email, password });
+  const path = redirectUrl === undefined
+    ? "auth/v1/signup"
+    : `auth/v1/signup?redirect_to=${encodeURIComponent(redirectUrl)}`;
+  const response = await requestSupabase(path, { email, password });
 
   if (!response.ok) {
     const payload = await readJson(response);
@@ -315,4 +414,12 @@ export const status = async (): Promise<AuthStatus> => {
     state: "logged_in",
     accounts: credentials.map((credential) => credential.account),
   };
+};
+
+export const completeSignupFromFragment = async (
+  fragment: string,
+): Promise<SignupRedirect> => {
+  const result = parseSignupFragment(fragment);
+  await storeRefreshToken(result.account, result.refreshToken);
+  return result;
 };

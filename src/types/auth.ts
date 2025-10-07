@@ -33,3 +33,8 @@ export type EmailOption = {
 };
 
 export type RawModeCapableInput = NodeJS.ReadStream & { fd: 0 };
+
+export type SignupRedirect = AccessTokenResult & {
+  account: string;
+  refreshToken: string;
+};
