@@ -202,7 +202,11 @@ const promptHiddenInput = (promptText: string): Promise<string> => {
     if (!input.isTTY || !output.isTTY) {
       rl.question(promptText, (answer) => {
         rl.close();
-        resolve(ensureNonEmpty(answer, "Password"));
+        if (answer.length === 0) {
+          reject(new Error("Password must not be empty."));
+          return;
+        }
+        resolve(answer);
       });
       return;
     }
@@ -234,7 +238,12 @@ const promptHiddenInput = (promptText: string): Promise<string> => {
         if (char === "\r" || char === "\n") {
           cleanup();
           output.write("\n");
-          resolve(ensureNonEmpty(collected.join(""), "Password"));
+          const password = collected.join("");
+          if (password.length === 0) {
+            reject(new Error("Password must not be empty."));
+            return;
+          }
+          resolve(password);
           return;
         }
         if (char === "\u007f") {
