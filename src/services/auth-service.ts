@@ -73,7 +73,7 @@ const listStoredCredentials = (service: string): StoredCredential[] => {
   try {
     return findCredentials(service).map((credential) => ({
       account: credential.account,
-      password: credential.password,
+      refreshToken: credential.password,
     }));
   } catch (error) {
     throw new Error(
@@ -277,11 +277,11 @@ const findStoredCredential = async (
 
   if (preferredAccount !== undefined) {
     const entry = new AsyncEntry(service, preferredAccount);
-    const password = await entry.getPassword();
-    if (password === undefined || password === null) {
+    const refreshToken = await entry.getPassword();
+    if (refreshToken === undefined || refreshToken === null) {
       return null;
     }
-    return { account: preferredAccount, password };
+    return { account: preferredAccount, refreshToken };
   }
 
   const credentials = listStoredCredentials(service);
@@ -374,7 +374,7 @@ export const getAccessToken = async (
   const response = await requestSupabase(
     "auth/v1/token?grant_type=refresh_token",
     {
-      refresh_token: credential.password,
+      refresh_token: credential.refreshToken,
     },
   );
 

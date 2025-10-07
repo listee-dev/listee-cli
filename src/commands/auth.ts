@@ -52,24 +52,6 @@ type LoopbackServer = {
   shutdown: () => Promise<void>;
 };
 
-const successPage = (message: string): string => {
-  return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Listee CLI Signup</title>
-    <style>
-      body { font-family: sans-serif; margin: 3rem; color: #111; }
-    </style>
-  </head>
-  <body>
-    <h1>${message}</h1>
-    <p>This window is part of the Listee CLI signup flow.</p>
-    <p>You may close this window and return to your terminal.</p>
-  </body>
-</html>`;
-};
-
 const callbackPage = `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -80,19 +62,36 @@ const callbackPage = `<!DOCTYPE html>
     </style>
   </head>
   <body>
-    <h1>Completing signup...</h1>
+    <h1 id="headline">Completing signup...</h1>
     <p>This window is part of the Listee CLI signup flow and will update automatically.</p>
+    <p id="details">You may close this window and return to your terminal once it finishes.</p>
     <script>
       (async () => {
+        const headline = document.getElementById("headline");
+        const details = document.getElementById("details");
         const response = await fetch("/token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ hash: window.location.hash })
         });
-        const text = await response.text();
-        document.body.innerHTML = text;
+        try {
+          const payload = await response.json();
+          headline.textContent = payload.title ?? "Signup complete.";
+          details.textContent = payload.message ?? "You may now return to your terminal.";
+          if (!response.ok) {
+            document.body.dataset.status = "error";
+          }
+        } catch (error) {
+          headline.textContent = "Unable to complete signup.";
+          details.textContent = String(error);
+          document.body.dataset.status = "error";
+        }
       })().catch((error) => {
-        document.body.innerHTML = "<p>Failed to complete signup: " + error + ". You can close this window.</p>";
+        const headline = document.getElementById("headline");
+        const details = document.getElementById("details");
+        headline.textContent = "Unable to complete signup.";
+        details.textContent = String(error);
+        document.body.dataset.status = "error";
       });
     </script>
   </body>
@@ -109,6 +108,10 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
       res.end(body);
     };
 
+    const respondWithJson = (status: number, payload: { title: string; message: string }): void => {
+      finish(status, JSON.stringify(payload), "application/json");
+    };
+
     if (req.method === "GET" && req.url?.startsWith("/callback")) {
       finish(200, callbackPage);
       return;
@@ -121,7 +124,10 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
       });
       req.on("end", async () => {
         if (settled) {
-          finish(200, successPage("Signup already completed."));
+          respondWithJson(200, {
+            title: "Signup already completed.",
+            message: "You may close this window and return to your terminal.",
+          });
           return;
         }
         try {
@@ -132,10 +138,16 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
           }
           const result = await completeSignupFromFragment(hash);
           settled = true;
-          finish(200, successPage("Signup confirmed."));
+          respondWithJson(200, {
+            title: "Signup confirmed.",
+            message: "You may close this window and return to your terminal.",
+          });
           resolveResult?.(result);
         } catch (error) {
-          finish(400, successPage(`Failed to complete signup: ${error instanceof Error ? error.message : String(error)}`));
+          respondWithJson(400, {
+            title: "Failed to complete signup.",
+            message: error instanceof Error ? error.message : String(error),
+          });
           rejectResult?.(error);
         }
       });
@@ -172,7 +184,11 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
       settled = true;
       rejectResult?.(new Error("Signup confirmation timed out."));
     }
-    void server.close();
+    void (async () => {
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
+    })();
   }, LOOPBACK_TIMEOUT_MS);
 
   const shutdown = async (): Promise<void> => {
@@ -306,7 +322,7 @@ const loginAction = async (options: EmailOption): Promise<void> => {
   ensureSupabaseConfig();
   const email = ensureEmail(options.email);
   const password = await promptHiddenInput("Password: ");
-  const _token = await login(email, password);
+  await login(email, password);
   console.log("✅ Logged in.");
 };
 

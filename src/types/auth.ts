@@ -15,7 +15,7 @@ export type SupabaseErrorPayload = {
 
 export type StoredCredential = {
   account: string;
-  password: string;
+  refreshToken: string;
 };
 
 export type AccessTokenResult = {
