@@ -34,6 +34,8 @@ listee auth status
 listee auth logout
 ```
 
+`listee auth signup` starts a temporary local callback server. Leave the command running, open the confirmation email, and the CLI will finish automatically once the browser redirects back to the loopback URL.
+
 ## Scripts
 | Command | Description |
 | --- | --- |
@@ -47,7 +49,7 @@ listee auth logout
 src/
   index.ts          # CLI entrypoint (Commander wiring)
   commands/auth.ts  # Auth subcommands
-  services/authService.ts
+  services/auth-service.ts
 AGENTS.md           # Agent-specific automation guidelines
 ```
 

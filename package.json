@@ -1,0 +1,27 @@
+{
+  "name": "listee-cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "listee": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "bun x tsc -b",
+    "dev": "bun run watch",
+    "watch": "bun x tsc --watch --preserveWatchOutput",
+    "start": "node dist/index.js",
+    "lint": "bun x biome ci .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@napi-rs/keyring": "^1.2.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.4",
+    "@types/bun": "^1.2.23",
+    "@types/node": "^20.14.2",
+    "typescript": "^5.9.2"
+  }
+}
