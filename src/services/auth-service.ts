@@ -489,9 +489,17 @@ const provisionSignupAccount = async (
   const userId = extractSubjectFromTokenPayload(tokenPayload);
   const provisioner = getAccountProvisioner();
 
-  await provisioner.provision({
-    userId,
-    token: tokenPayload,
-    email: result.account,
-  });
+  try {
+    await provisioner.provision({
+      userId,
+      token: tokenPayload,
+      email: result.account,
+    });
+  } catch (error) {
+    const message = toErrorMessage(error);
+    console.error(
+      `Account provisioning failed for ${result.account}: ${message}`,
+    );
+    throw new Error(`Account provisioning failed: ${message}`);
+  }
 };
