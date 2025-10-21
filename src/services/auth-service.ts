@@ -1,4 +1,9 @@
 import { Buffer } from "node:buffer";
+import {
+  type AccountProvisioner,
+  createAccountProvisioner,
+} from "@listee/auth";
+import type { SupabaseToken } from "@listee/types";
 import { AsyncEntry, findCredentials } from "@napi-rs/keyring";
 import type {
   AccessTokenResult,
@@ -9,9 +14,15 @@ import type {
   SupabaseTokenResponse,
 } from "../types/auth.js";
 
-export type { AccessTokenResult, AuthStatus, SignupRedirect } from "../types/auth.js";
-
 const DEFAULT_SERVICE_NAME = "listee-cli";
+let cachedAccountProvisioner: AccountProvisioner | null = null;
+
+const getAccountProvisioner = (): AccountProvisioner => {
+  if (cachedAccountProvisioner === null) {
+    cachedAccountProvisioner = createAccountProvisioner();
+  }
+  return cachedAccountProvisioner;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
@@ -197,12 +208,30 @@ const decodeJwtPayload = (token: string): unknown => {
   }
 };
 
-const extractEmailFromAccessToken = (token: string): string => {
+const isSupabaseTokenPayload = (payload: unknown): payload is SupabaseToken => {
+  return isRecord(payload);
+};
+
+const decodeSupabaseToken = (token: string): SupabaseToken => {
   const payload = decodeJwtPayload(token);
-  if (!isRecord(payload)) {
+  if (!isSupabaseTokenPayload(payload)) {
     throw new Error("Access token payload structure is invalid.");
   }
 
+  return payload;
+};
+
+const extractSubjectFromTokenPayload = (payload: SupabaseToken): string => {
+  const subjectValue = payload.sub;
+  if (!isString(subjectValue) || subjectValue.trim().length === 0) {
+    throw new Error("Access token payload did not include a user id.");
+  }
+
+  return subjectValue.trim();
+};
+
+const extractEmailFromAccessToken = (token: string): string => {
+  const payload = decodeSupabaseToken(token);
   const email = payload.email;
   if (!isString(email) || email.trim().length === 0) {
     throw new Error("Access token payload did not include an email.");
@@ -325,9 +354,10 @@ export const signup = async (
   password: string,
   redirectUrl?: string,
 ): Promise<void> => {
-  const path = redirectUrl === undefined
-    ? "auth/v1/signup"
-    : `auth/v1/signup?redirect_to=${encodeURIComponent(redirectUrl)}`;
+  const path =
+    redirectUrl === undefined
+      ? "auth/v1/signup"
+      : `auth/v1/signup?redirect_to=${encodeURIComponent(redirectUrl)}`;
   const response = await requestSupabase(path, { email, password });
 
   if (!response.ok) {
@@ -420,6 +450,21 @@ export const completeSignupFromFragment = async (
   fragment: string,
 ): Promise<SignupRedirect> => {
   const result = parseSignupFragment(fragment);
+  await provisionSignupAccount(result);
   await storeRefreshToken(result.account, result.refreshToken);
   return result;
+};
+
+const provisionSignupAccount = async (
+  result: SignupRedirect,
+): Promise<void> => {
+  const tokenPayload = decodeSupabaseToken(result.accessToken);
+  const userId = extractSubjectFromTokenPayload(tokenPayload);
+  const provisioner = getAccountProvisioner();
+
+  await provisioner.provision({
+    userId,
+    token: tokenPayload,
+    email: result.account,
+  });
 };
