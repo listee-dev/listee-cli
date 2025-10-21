@@ -209,7 +209,34 @@ const decodeJwtPayload = (token: string): unknown => {
 };
 
 const isSupabaseTokenPayload = (payload: unknown): payload is SupabaseToken => {
-  return isRecord(payload);
+  if (!isRecord(payload)) {
+    return false;
+  }
+
+  const subValue = "sub" in payload ? payload.sub : undefined;
+  const emailValue = "email" in payload ? payload.email : undefined;
+  const expValue = "exp" in payload ? payload.exp : undefined;
+  const iatValue = "iat" in payload ? payload.iat : undefined;
+
+  if (
+    !isString(subValue) ||
+    subValue.trim().length === 0 ||
+    !isString(emailValue) ||
+    emailValue.trim().length === 0 ||
+    !isNumber(expValue) ||
+    expValue <= 0 ||
+    !isNumber(iatValue) ||
+    iatValue <= 0
+  ) {
+    return false;
+  }
+
+  const currentEpochSeconds = Math.floor(Date.now() / 1000);
+  if (expValue <= currentEpochSeconds) {
+    return false;
+  }
+
+  return true;
 };
 
 const decodeSupabaseToken = (token: string): SupabaseToken => {
