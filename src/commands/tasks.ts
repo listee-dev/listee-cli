@@ -1,5 +1,9 @@
 import type { Command } from "commander";
-import { getTask, listTasksByCategory } from "../services/task-api.js";
+import {
+  createTask,
+  getTask,
+  listTasksByCategory,
+} from "../services/task-api.js";
 
 const execute = <T extends unknown[]>(task: (...args: T) => Promise<void>) => {
   return async (...args: T): Promise<void> => {
@@ -14,6 +18,14 @@ const execute = <T extends unknown[]>(task: (...args: T) => Promise<void>) => {
       process.exitCode = 1;
     }
   };
+};
+
+const ensureNonEmptyString = (value: string, label: string): string => {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error(`${label} must not be empty.`);
+  }
+  return trimmed;
 };
 
 const printTasks = (
@@ -35,6 +47,29 @@ const printTasks = (
     const details = item.description === null ? "" : ` — ${item.description}`;
     console.log(` • ${status} ${item.name} (${item.id})${details}`);
   }
+};
+
+const printTaskDetails = (task: {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly isChecked: boolean;
+  readonly categoryId: string;
+  readonly createdBy: string;
+  readonly updatedBy: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}): void => {
+  const status = task.isChecked ? "[x]" : "[ ]";
+  console.log(`Name: ${task.name}`);
+  console.log(`ID: ${task.id}`);
+  console.log(`Description: ${task.description ?? ""}`);
+  console.log(`Status: ${status}`);
+  console.log(`Category: ${task.categoryId}`);
+  console.log(`Created By: ${task.createdBy}`);
+  console.log(`Updated By: ${task.updatedBy}`);
+  console.log(`Created At: ${task.createdAt}`);
+  console.log(`Updated At: ${task.updatedAt}`);
 };
 
 export const registerTaskCommand = (program: Command): void => {
@@ -72,17 +107,46 @@ export const registerTaskCommand = (program: Command): void => {
     .action(
       execute(async (taskId: string, options: { readonly email?: string }) => {
         const response = await getTask({ taskId, email: options.email });
-        const task = response.data;
-        const status = task.isChecked ? "[x]" : "[ ]";
-        console.log(`Name: ${task.name}`);
-        console.log(`ID: ${task.id}`);
-        console.log(`Description: ${task.description ?? ""}`);
-        console.log(`Status: ${status}`);
-        console.log(`Category: ${task.categoryId}`);
-        console.log(`Created By: ${task.createdBy}`);
-        console.log(`Updated By: ${task.updatedBy}`);
-        console.log(`Created At: ${task.createdAt}`);
-        console.log(`Updated At: ${task.updatedAt}`);
+        printTaskDetails(response.data);
       }),
+    );
+
+  tasks
+    .command("create")
+    .description("Create a new task within a category.")
+    .requiredOption(
+      "--category <categoryId>",
+      "Category identifier to attach the new task to",
+    )
+    .requiredOption("--name <name>", "Name of the task to create")
+    .option("--description <description>", "Optional description for the task")
+    .option("--checked", "Mark the task as checked upon creation")
+    .option("--email <email>", "Account email to use when creating the task")
+    .action(
+      execute(
+        async (options: {
+          readonly category: string;
+          readonly name: string;
+          readonly description?: string;
+          readonly checked?: boolean;
+          readonly email?: string;
+        }) => {
+          const categoryId = ensureNonEmptyString(options.category, "Category");
+          const name = ensureNonEmptyString(options.name, "Name");
+          const description =
+            options.description === undefined
+              ? undefined
+              : options.description.trim();
+          const task = await createTask({
+            categoryId,
+            name,
+            description,
+            isChecked: options.checked === true ? true : undefined,
+            email: options.email,
+          });
+          console.log("Task created.");
+          printTaskDetails(task);
+        },
+      ),
     );
 };

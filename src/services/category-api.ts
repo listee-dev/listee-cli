@@ -140,3 +140,28 @@ export const getCategory = async (
   const payload = await requestJson(path, context.authorizationValue);
   return toCategoryDetail(payload);
 };
+
+export type CreateCategoryParams = {
+  readonly email?: string;
+  readonly name: string;
+  readonly kind?: string;
+};
+
+export const createCategory = async (
+  params: CreateCategoryParams,
+): Promise<Category> => {
+  const context = await createAuthenticatedContext(params.email);
+  const path = `/users/${encodeURIComponent(context.userId)}/categories`;
+  const payload = await requestJson(path, context.authorizationValue, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: params.name,
+      kind: params.kind ?? "user",
+    }),
+  });
+
+  return toCategoryDetail(payload).data;
+};

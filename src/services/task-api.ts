@@ -102,3 +102,33 @@ export const getTask = async (
   const payload = await requestJson(path, context.authorizationValue);
   return toTaskDetail(payload);
 };
+
+export type CreateTaskParams = {
+  readonly email?: string;
+  readonly categoryId: string;
+  readonly name: string;
+  readonly description?: string | null;
+  readonly isChecked?: boolean;
+};
+
+export const createTask = async (params: CreateTaskParams): Promise<Task> => {
+  const context = await createAuthenticatedContext(params.email);
+  const path = `/categories/${encodeURIComponent(params.categoryId)}/tasks`;
+  const description =
+    params.description === undefined ? null : params.description;
+  const body = {
+    name: params.name,
+    description,
+    ...(params.isChecked === undefined ? {} : { isChecked: params.isChecked }),
+  };
+
+  const payload = await requestJson(path, context.authorizationValue, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  return toTaskDetail(payload).data;
+};

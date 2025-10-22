@@ -1,5 +1,9 @@
 import type { Command } from "commander";
-import { getCategory, listCategories } from "../services/category-api.js";
+import {
+  createCategory,
+  getCategory,
+  listCategories,
+} from "../services/category-api.js";
 
 const ensurePositiveInteger = (value: string): number => {
   if (!/^\d+$/.test(value)) {
@@ -10,6 +14,14 @@ const ensurePositiveInteger = (value: string): number => {
     throw new Error("Limit must be a positive integer.");
   }
   return parsed;
+};
+
+const ensureNonEmptyString = (value: string, label: string): string => {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error(`${label} must not be empty.`);
+  }
+  return trimmed;
 };
 
 const execute = <T extends unknown[]>(task: (...args: T) => Promise<void>) => {
@@ -43,6 +55,24 @@ const printCategories = (
   for (const item of items) {
     console.log(` • ${item.name} (${item.id}) [${item.kind}]`);
   }
+};
+
+const printCategoryDetails = (category: {
+  readonly name: string;
+  readonly id: string;
+  readonly kind: string;
+  readonly createdBy: string;
+  readonly updatedBy: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}): void => {
+  console.log(`Name: ${category.name}`);
+  console.log(`ID: ${category.id}`);
+  console.log(`Kind: ${category.kind}`);
+  console.log(`Created By: ${category.createdBy}`);
+  console.log(`Updated By: ${category.updatedBy}`);
+  console.log(`Created At: ${category.createdAt}`);
+  console.log(`Updated At: ${category.updatedAt}`);
 };
 
 export const registerCategoryCommand = (program: Command): void => {
@@ -99,14 +129,29 @@ export const registerCategoryCommand = (program: Command): void => {
             email: options.email,
             categoryId,
           });
-          const category = response.data;
-          console.log(`Name: ${category.name}`);
-          console.log(`ID: ${category.id}`);
-          console.log(`Kind: ${category.kind}`);
-          console.log(`Created By: ${category.createdBy}`);
-          console.log(`Updated By: ${category.updatedBy}`);
-          console.log(`Created At: ${category.createdAt}`);
-          console.log(`Updated At: ${category.updatedAt}`);
+          printCategoryDetails(response.data);
+        },
+      ),
+    );
+
+  categories
+    .command("create")
+    .description("Create a new category for the authenticated user.")
+    .requiredOption("--name <name>", "Name of the category to create")
+    .option(
+      "--email <email>",
+      "Account email to use when creating the category",
+    )
+    .action(
+      execute(
+        async (options: { readonly name: string; readonly email?: string }) => {
+          const name = ensureNonEmptyString(options.name, "Name");
+          const category = await createCategory({
+            email: options.email,
+            name,
+          });
+          console.log("Category created.");
+          printCategoryDetails(category);
         },
       ),
     );

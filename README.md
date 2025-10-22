@@ -37,7 +37,9 @@ listee auth status
 listee auth logout
 listee categories list [--email you@example.com]
 listee categories show <categoryId> [--email you@example.com]
+listee categories create --name "Inbox" [--email you@example.com]
 listee tasks list --category <categoryId> [--email you@example.com]
+listee tasks create --category <categoryId> --name "Task title" [--description "..."] [--checked] [--email you@example.com]
 listee tasks show <taskId> [--email you@example.com]
 ```
 
