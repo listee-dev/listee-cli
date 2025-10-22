@@ -16,7 +16,9 @@ bun install
 Create a `.env` file or export environment variables before running commands:
 ```bash
 export SUPABASE_URL="https://your-project.supabase.co"
-export SUPABASE_ANON_KEY="your-anon-key"
+export SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
+# legacy fallback (deprecated, only if publishable key is unavailable)
+# export SUPABASE_ANON_KEY="your-anon-key"
 export LISTEE_API_URL="https://api.your-listee-instance.dev"
 # optional: override the Keytar service name
 export LISTEE_CLI_KEYCHAIN_SERVICE="listee-cli"
