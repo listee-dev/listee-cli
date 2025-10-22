@@ -17,8 +17,11 @@ Create a `.env` file or export environment variables before running commands:
 ```bash
 export SUPABASE_URL="https://your-project.supabase.co"
 export SUPABASE_ANON_KEY="your-anon-key"
+export LISTEE_API_URL="https://api.your-listee-instance.dev"
 # optional: override the Keytar service name
 export LISTEE_CLI_KEYCHAIN_SERVICE="listee-cli"
+# optional: choose bearer header value ("user-id" for local API mocks, "access-token" for real JWT)
+export LISTEE_API_AUTH_BEARER_MODE="user-id"
 ```
 Never commit secrets; the repo defaults to reading from the process environment.
 
@@ -32,6 +35,10 @@ listee auth signup --email you@example.com
 listee auth login --email you@example.com
 listee auth status
 listee auth logout
+listee categories list [--email you@example.com]
+listee categories show <categoryId> [--email you@example.com]
+listee tasks list --category <categoryId> [--email you@example.com]
+listee tasks show <taskId> [--email you@example.com]
 ```
 
 `listee auth signup` starts a temporary local callback server. Leave the command running, open the confirmation email, and the CLI will finish automatically once the browser redirects back to the loopback URL.
@@ -49,7 +56,12 @@ listee auth logout
 src/
   index.ts          # CLI entrypoint (Commander wiring)
   commands/auth.ts  # Auth subcommands
+  commands/categories.ts
+  commands/tasks.ts
   services/auth-service.ts
+  services/api-client.ts
+  services/category-api.ts
+  services/task-api.ts
 AGENTS.md           # Agent-specific automation guidelines
 ```
 
