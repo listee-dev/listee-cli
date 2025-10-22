@@ -188,11 +188,12 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
   });
 
   const address = server.address();
-  if (
-    address === null ||
-    typeof address !== "object" ||
-    address.port === undefined
-  ) {
+  if (address === null || typeof address === "string") {
+    server.close();
+    throw new Error("Failed to determine loopback server port.");
+  }
+  const { port } = address;
+  if (port === undefined) {
     server.close();
     throw new Error("Failed to determine loopback server port.");
   }
@@ -217,7 +218,7 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
   };
 
   return {
-    redirectUrl: `http://${LOOPBACK_HOST}:${address.port}/callback`,
+    redirectUrl: `http://${LOOPBACK_HOST}:${port}/callback`,
     waitForConfirmation: () =>
       waitForConfirmation.finally(() => clearTimeout(timeout)),
     shutdown,
