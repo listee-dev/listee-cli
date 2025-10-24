@@ -103,12 +103,19 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
   let settled = false;
 
   const server = createServer((req, res) => {
-    const finish = (status: number, body: string, contentType = "text/html"): void => {
+    const finish = (
+      status: number,
+      body: string,
+      contentType = "text/html",
+    ): void => {
       res.writeHead(status, { "Content-Type": contentType });
       res.end(body);
     };
 
-    const respondWithJson = (status: number, payload: { title: string; message: string }): void => {
+    const respondWithJson = (
+      status: number,
+      payload: { title: string; message: string },
+    ): void => {
       finish(status, JSON.stringify(payload), "application/json");
     };
 
@@ -174,7 +181,11 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
   });
 
   const address = server.address();
-  if (address === null || typeof address !== "object" || address.port === undefined) {
+  if (
+    address === null ||
+    typeof address !== "object" ||
+    address.port === undefined
+  ) {
     server.close();
     throw new Error("Failed to determine loopback server port.");
   }
@@ -200,7 +211,8 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
 
   return {
     redirectUrl: `http://${LOOPBACK_HOST}:${address.port}/callback`,
-    waitForConfirmation: () => waitForConfirmation.finally(() => clearTimeout(timeout)),
+    waitForConfirmation: () =>
+      waitForConfirmation.finally(() => clearTimeout(timeout)),
     shutdown,
   };
 };
@@ -344,7 +356,9 @@ const signupAction = async (options: EmailOption): Promise<void> => {
 
   try {
     await signup(email, password, loopback.redirectUrl);
-    console.log("📩 Confirmation email sent. Keep this terminal open while you click the link.");
+    console.log(
+      "📩 Confirmation email sent. Keep this terminal open while you click the link.",
+    );
     const result = await loopback.waitForConfirmation();
     console.log(`✅ Signup confirmed for ${result.account}.`);
   } finally {
