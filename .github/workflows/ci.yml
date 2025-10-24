@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    uses: listee-dev/listee-ci/.github/workflows/lint.yml@main
+
+  typecheck:
+    uses: listee-dev/listee-ci/.github/workflows/typecheck.yml@main
+
+  test:
+    uses: listee-dev/listee-ci/.github/workflows/test.yml@main

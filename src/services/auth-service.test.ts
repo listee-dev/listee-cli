@@ -67,11 +67,20 @@ describe("parseSignupFragment", () => {
   };
 
   const header = encodeSegment(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const payload = encodeSegment(JSON.stringify({ email: "user@example.com" }));
+  const payloadSegment = (): string => {
+    const currentEpoch = Math.floor(Date.now() / 1000);
+    const payload = {
+      sub: "user-id",
+      email: "user@example.com",
+      exp: currentEpoch + 3600,
+      iat: currentEpoch,
+    };
+    return encodeSegment(JSON.stringify(payload));
+  };
   const signature = encodeSegment("signature");
-  const accessToken = `${header}.${payload}.${signature}`;
 
   it("parses tokens from a confirmation fragment", () => {
+    const accessToken = `${header}.${payloadSegment()}.${signature}`;
     const fragment = `#access_token=${accessToken}&refresh_token=refresh123&expires_in=3600&token_type=bearer&type=signup`;
     const result = parseSignupFragment(fragment);
 
