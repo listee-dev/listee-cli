@@ -1,8 +1,10 @@
 import type { Command } from "commander";
 import {
   createTask,
+  deleteTask,
   getTask,
   listTasksByCategory,
+  updateTask,
 } from "../services/task-api.js";
 
 const execute = <T extends unknown[]>(task: (...args: T) => Promise<void>) => {
@@ -148,5 +150,96 @@ export const registerTaskCommand = (program: Command): void => {
           printTaskDetails(task);
         },
       ),
+    );
+
+  tasks
+    .command("update <taskId>")
+    .description("Update an existing task.")
+    .option("--name <name>", "New name for the task")
+    .option("--description <description>", "New description for the task")
+    .option("--clear-description", "Remove the task description")
+    .option("--checked", "Mark the task as checked")
+    .option("--unchecked", "Mark the task as unchecked")
+    .option("--email <email>", "Account email to use when updating the task")
+    .action(
+      execute(
+        async (
+          taskId: string,
+          options: {
+            readonly name?: string;
+            readonly description?: string;
+            readonly clearDescription?: boolean;
+            readonly checked?: boolean;
+            readonly unchecked?: boolean;
+            readonly email?: string;
+          },
+        ) => {
+          const id = ensureNonEmptyString(taskId, "Task ID");
+          const name =
+            options.name === undefined
+              ? undefined
+              : ensureNonEmptyString(options.name, "Name");
+
+          if (options.checked === true && options.unchecked === true) {
+            throw new Error(
+              "--checked and --unchecked cannot be used together.",
+            );
+          }
+
+          if (
+            options.clearDescription === true &&
+            options.description !== undefined
+          ) {
+            throw new Error(
+              "--description cannot be combined with --clear-description.",
+            );
+          }
+
+          const description =
+            options.clearDescription === true
+              ? null
+              : options.description === undefined
+                ? undefined
+                : options.description.trim();
+          const isChecked =
+            options.checked === true
+              ? true
+              : options.unchecked === true
+                ? false
+                : undefined;
+
+          if (
+            name === undefined &&
+            description === undefined &&
+            isChecked === undefined
+          ) {
+            throw new Error(
+              "Provide at least one update option (--name, --description, --clear-description, --checked, --unchecked).",
+            );
+          }
+
+          const task = await updateTask({
+            taskId: id,
+            name,
+            description,
+            isChecked,
+            email: options.email,
+          });
+          console.log("Task updated.");
+          printTaskDetails(task);
+        },
+      ),
+    );
+
+  tasks
+    .command("delete <taskId>")
+    .description("Delete a task.")
+    .option("--email <email>", "Account email to use when deleting the task")
+    .action(
+      execute(async (taskId: string, options: { readonly email?: string }) => {
+        const id = ensureNonEmptyString(taskId, "Task ID");
+        await deleteTask({ taskId: id, email: options.email });
+        console.log("Task deleted.");
+      }),
     );
 };

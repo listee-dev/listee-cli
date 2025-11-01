@@ -1,8 +1,10 @@
 import type { Command } from "commander";
 import {
   createCategory,
+  deleteCategory,
   getCategory,
   listCategories,
+  updateCategory,
 } from "../services/category-api.js";
 
 const ensurePositiveInteger = (value: string): number => {
@@ -152,6 +154,54 @@ export const registerCategoryCommand = (program: Command): void => {
           });
           console.log("Category created.");
           printCategoryDetails(category);
+        },
+      ),
+    );
+
+  categories
+    .command("update <categoryId>")
+    .description("Update an existing category for the authenticated user.")
+    .requiredOption("--name <name>", "New name for the category")
+    .option(
+      "--email <email>",
+      "Account email to use when updating the category",
+    )
+    .action(
+      execute(
+        async (
+          categoryId: string,
+          options: {
+            readonly name: string;
+            readonly email?: string;
+          },
+        ) => {
+          const id = ensureNonEmptyString(categoryId, "Category ID");
+          const name = ensureNonEmptyString(options.name, "Name");
+
+          const category = await updateCategory({
+            categoryId: id,
+            name,
+            email: options.email,
+          });
+          console.log("Category updated.");
+          printCategoryDetails(category);
+        },
+      ),
+    );
+
+  categories
+    .command("delete <categoryId>")
+    .description("Delete a category for the authenticated user.")
+    .option(
+      "--email <email>",
+      "Account email to use when deleting the category",
+    )
+    .action(
+      execute(
+        async (categoryId: string, options: { readonly email?: string }) => {
+          const id = ensureNonEmptyString(categoryId, "Category ID");
+          await deleteCategory({ categoryId: id, email: options.email });
+          console.log("Category deleted.");
         },
       ),
     );

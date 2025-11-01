@@ -132,3 +132,50 @@ export const createTask = async (params: CreateTaskParams): Promise<Task> => {
 
   return toTaskDetail(payload).data;
 };
+
+export type UpdateTaskParams = {
+  readonly email?: string;
+  readonly taskId: string;
+  readonly name?: string;
+  readonly description?: string | null;
+  readonly isChecked?: boolean;
+};
+
+export const updateTask = async (params: UpdateTaskParams): Promise<Task> => {
+  const context = await createAuthenticatedContext(params.email);
+  const path = `/tasks/${encodeURIComponent(params.taskId)}`;
+  const body = {
+    ...(params.name === undefined ? {} : { name: params.name }),
+    ...(params.description === undefined
+      ? {}
+      : { description: params.description }),
+    ...(params.isChecked === undefined ? {} : { isChecked: params.isChecked }),
+  };
+
+  if (Object.keys(body).length === 0) {
+    throw new Error("No task fields were provided for update.");
+  }
+
+  const payload = await requestJson(path, context.authorizationValue, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  return toTaskDetail(payload).data;
+};
+
+export type DeleteTaskParams = {
+  readonly email?: string;
+  readonly taskId: string;
+};
+
+export const deleteTask = async (params: DeleteTaskParams): Promise<void> => {
+  const context = await createAuthenticatedContext(params.email);
+  const path = `/tasks/${encodeURIComponent(params.taskId)}`;
+  await requestJson(path, context.authorizationValue, {
+    method: "DELETE",
+  });
+};

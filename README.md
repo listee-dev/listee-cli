@@ -40,9 +40,13 @@ listee auth logout
 listee categories list [--email you@example.com]
 listee categories show <categoryId> [--email you@example.com]
 listee categories create --name "Inbox" [--email you@example.com]
+listee categories update <categoryId> --name "New name" [--email you@example.com]
+listee categories delete <categoryId> [--email you@example.com]
 listee tasks list --category <categoryId> [--email you@example.com]
 listee tasks create --category <categoryId> --name "Task title" [--description "..."] [--checked] [--email you@example.com]
 listee tasks show <taskId> [--email you@example.com]
+listee tasks update <taskId> [--name "New title"] [--description "..."] [--clear-description] [--checked|--unchecked] [--email you@example.com]
+listee tasks delete <taskId> [--email you@example.com]
 ```
 
 `listee auth signup` starts a temporary local callback server. Leave the command running, open the confirmation email, and the CLI will finish automatically once the browser redirects back to the loopback URL.

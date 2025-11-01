@@ -165,3 +165,44 @@ export const createCategory = async (
 
   return toCategoryDetail(payload).data;
 };
+
+export type UpdateCategoryParams = {
+  readonly email?: string;
+  readonly categoryId: string;
+  readonly name?: string;
+};
+
+export const updateCategory = async (
+  params: UpdateCategoryParams,
+): Promise<Category> => {
+  const context = await createAuthenticatedContext(params.email);
+  const path = `/categories/${encodeURIComponent(params.categoryId)}`;
+  if (params.name === undefined) {
+    throw new Error("No category fields were provided for update.");
+  }
+
+  const payload = await requestJson(path, context.authorizationValue, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: params.name }),
+  });
+
+  return toCategoryDetail(payload).data;
+};
+
+export type DeleteCategoryParams = {
+  readonly email?: string;
+  readonly categoryId: string;
+};
+
+export const deleteCategory = async (
+  params: DeleteCategoryParams,
+): Promise<void> => {
+  const context = await createAuthenticatedContext(params.email);
+  const path = `/categories/${encodeURIComponent(params.categoryId)}`;
+  await requestJson(path, context.authorizationValue, {
+    method: "DELETE",
+  });
+};
