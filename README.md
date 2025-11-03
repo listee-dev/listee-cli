@@ -22,8 +22,7 @@ export SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
 export LISTEE_API_URL="https://api.your-listee-instance.dev"
 # optional: override the Keytar service name
 export LISTEE_CLI_KEYCHAIN_SERVICE="listee-cli"
-# optional: choose bearer header value ("user-id" for local API mocks, "access-token" for real JWT)
-export LISTEE_API_AUTH_BEARER_MODE="user-id"
+# authorization headers always use Supabase access tokens (JWT)
 ```
 Never commit secrets; the repo defaults to reading from the process environment.
 

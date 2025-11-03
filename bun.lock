@@ -4,8 +4,8 @@
     "": {
       "name": "listee-cli",
       "dependencies": {
-        "@listee/auth": "^0.3.0",
-        "@listee/types": "^0.3.0",
+        "@listee/auth": "^0.4.0",
+        "@listee/types": "^0.4.0",
         "@napi-rs/keyring": "^1.2.0",
         "commander": "^12.1.0",
         "dotenv": "^16.4.5",
@@ -37,11 +37,11 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.2.5", "", { "os": "win32", "cpu": "x64" }, "sha512-F/jhuXCssPFAuciMhHKk00xnCAxJRS/pUzVfXYmOMUp//XW7mO6QeCjsjvnm8L4AO/dG2VOB0O+fJPiJ2uXtIw=="],
 
-    "@listee/auth": ["@listee/auth@0.3.0", "", { "dependencies": { "@listee/db": "^0.3.0", "@listee/types": "^0.3.0", "jose": "^5.2.3" } }, "sha512-esTAtrv+SR0gtHg/HPCyZvG2NG+bY//h3U6tZuy4SuVsN/sZ0060c47GwVdV7Ety4j3no3HZDnGTAPpN1xir7A=="],
+    "@listee/auth": ["@listee/auth@0.4.0", "", { "dependencies": { "@listee/db": "^0.4.0", "@listee/types": "^0.4.0", "jose": "^5.2.3" } }, "sha512-Er3L7k1br6b/3ROLVrnI4xUzGeJMtpQdy2py9qd7d7S8SpBcZwUa1mejwfjACwrk2t/WyUNnhHF/Kgsk137q3Q=="],
 
-    "@listee/db": ["@listee/db@0.3.0", "", { "dependencies": { "drizzle-orm": "^0.44.5", "postgres": "^3.4.7" } }, "sha512-lokU4wQCp0Wr73U4qSe7Y5Zn6H8EdIvnKSUcvT5nXXcJSdqtwvk0KGpWk7HZUIoV8I6StAiMD/wUjckIqTFnwg=="],
+    "@listee/db": ["@listee/db@0.4.0", "", { "dependencies": { "drizzle-orm": "^0.44.5", "postgres": "^3.4.7" } }, "sha512-6WOSt6UZy+fX2TnsrLl812P9NdWPocCGrOzN6kVnfdR61rbh2OE8k6KPC3cXnGzbamIQBueeut8v66ho0lHsiw=="],
 
-    "@listee/types": ["@listee/types@0.3.0", "", { "dependencies": { "@listee/db": "^0.3.0" } }, "sha512-yfHI2ShIARi/TqTUC2/Sn41LhJMv4Stc7IrX0CeyiGisHfS7E4mg7NhLRKuQi77F6zzqhXkpORH2dQ21V7TDCQ=="],
+    "@listee/types": ["@listee/types@0.4.0", "", { "dependencies": { "@listee/db": "^0.4.0" } }, "sha512-UmQjgCGu23ebgHoP3zYknEDirASRADguKJleEsrU/XwBSfxb7xSyAmIz7Erf1vSjYY+qj35LnoydOk4mSdYHNQ=="],
 
     "@napi-rs/keyring": ["@napi-rs/keyring@1.2.0", "", { "optionalDependencies": { "@napi-rs/keyring-darwin-arm64": "1.2.0", "@napi-rs/keyring-darwin-x64": "1.2.0", "@napi-rs/keyring-freebsd-x64": "1.2.0", "@napi-rs/keyring-linux-arm-gnueabihf": "1.2.0", "@napi-rs/keyring-linux-arm64-gnu": "1.2.0", "@napi-rs/keyring-linux-arm64-musl": "1.2.0", "@napi-rs/keyring-linux-riscv64-gnu": "1.2.0", "@napi-rs/keyring-linux-x64-gnu": "1.2.0", "@napi-rs/keyring-linux-x64-musl": "1.2.0", "@napi-rs/keyring-win32-arm64-msvc": "1.2.0", "@napi-rs/keyring-win32-ia32-msvc": "1.2.0", "@napi-rs/keyring-win32-x64-msvc": "1.2.0" } }, "sha512-d0d4Oyxm+v980PEq1ZH2PmS6cvpMIRc17eYpiU47KgW+lzxklMu6+HOEOPmxrpnF/XQZ0+Q78I2mgMhbIIo/dg=="],
 

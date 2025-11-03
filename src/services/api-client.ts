@@ -1,19 +1,9 @@
-import { Buffer } from "node:buffer";
-import { getAccessToken } from "./auth-service.js";
-
-type JwtClaims = {
-  readonly sub?: string;
-  readonly email?: string;
-};
+import { getAuthenticatedAccessToken } from "./auth-service.js";
 
 type AuthenticatedContext = {
   readonly accessToken: string;
   readonly userId: string;
   readonly authorizationValue: string;
-};
-
-const isNonEmptyString = (value: unknown): value is string => {
-  return typeof value === "string" && value.trim().length > 0;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -35,85 +25,41 @@ const getApiBaseUrl = (): URL => {
   return new URL(rawUrl);
 };
 
-const decodeJwtClaims = (token: string): JwtClaims => {
-  const segments = token.split(".");
-  if (segments.length < 2) {
-    throw new Error("Access token is malformed.");
-  }
+type ParsedPayload =
+  | { type: "json"; body: unknown }
+  | { type: "text"; body: string }
+  | { type: "empty"; body: null };
 
-  const payloadSegment = segments[1];
-  try {
-    const decoded = Buffer.from(payloadSegment, "base64url").toString("utf8");
-    const parsed = JSON.parse(decoded);
-    if (!isRecord(parsed)) {
-      throw new Error("Access token payload is not an object.");
-    }
-
-    const subValue =
-      typeof parsed.sub === "string" && parsed.sub.length > 0
-        ? parsed.sub
-        : undefined;
-    const emailValue =
-      typeof parsed.email === "string" && parsed.email.length > 0
-        ? parsed.email
-        : undefined;
-
-    return {
-      ...(subValue === undefined ? {} : { sub: subValue }),
-      ...(emailValue === undefined ? {} : { email: emailValue }),
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown error";
-    throw new Error(`Failed to decode access token payload: ${message}`);
-  }
-};
-
-const readJson = async (response: Response): Promise<unknown> => {
+const readPayload = async (response: Response): Promise<ParsedPayload> => {
+  const contentType = response.headers.get("content-type") ?? "";
   const text = await response.text();
   if (text.trim().length === 0) {
-    return null;
-  }
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown error";
-    throw new Error(`Failed to parse API response: ${message}`);
-  }
-};
-
-const getAuthorizationMode = (): "access-token" | "user-id" => {
-  const raw = process.env.LISTEE_API_AUTH_BEARER_MODE;
-  if (raw === undefined || raw.trim().length === 0) {
-    return "user-id";
+    return { type: "empty", body: null };
   }
 
-  const value = raw.trim().toLowerCase();
-  if (value === "access-token" || value === "user-id") {
-    return value;
+  if (contentType.toLowerCase().includes("application/json")) {
+    try {
+      return { type: "json", body: JSON.parse(text) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown error";
+      throw new Error(`Failed to parse API response as JSON: ${message}`);
+    }
   }
 
-  throw new Error(
-    "LISTEE_API_AUTH_BEARER_MODE must be either 'access-token' or 'user-id'.",
-  );
+  return { type: "text", body: text };
 };
 
 export const createAuthenticatedContext = async (
   email?: string,
 ): Promise<AuthenticatedContext> => {
-  const tokenResult = await getAccessToken(email);
-  const claims = decodeJwtClaims(tokenResult.accessToken);
-  if (!isNonEmptyString(claims.sub)) {
-    throw new Error("Access token does not include the user identifier.");
-  }
-
-  const mode = getAuthorizationMode();
-  const authorizationValue =
-    mode === "user-id" ? claims.sub : tokenResult.accessToken;
+  const tokenResult = await getAuthenticatedAccessToken(email);
+  const accessToken = tokenResult.accessToken;
+  const userId = tokenResult.userId;
 
   return {
-    accessToken: tokenResult.accessToken,
-    userId: claims.sub,
-    authorizationValue,
+    accessToken,
+    userId,
+    authorizationValue: accessToken,
   };
 };
 
@@ -134,15 +80,30 @@ const buildUrl = (path: string): URL => {
   return new URL(normalizedPath, baseHref);
 };
 
-const extractErrorMessage = (payload: unknown, fallback: string): string => {
-  if (!isRecord(payload)) {
+const extractErrorMessage = (
+  payload: ParsedPayload,
+  fallback: string,
+): string => {
+  if (payload.type === "json") {
+    const body = payload.body;
+    if (isRecord(body)) {
+      const error = body.error;
+      if (error !== undefined) {
+        return typeof error === "string" ? error : String(error);
+      }
+    }
     return fallback;
   }
-  const error = payload.error;
-  if (error === undefined) {
-    return fallback;
+
+  if (payload.type === "text") {
+    const snippet =
+      payload.body.length > 200
+        ? `${payload.body.slice(0, 200)}…`
+        : payload.body;
+    return `${fallback}; raw response: ${snippet}`;
   }
-  return typeof error === "string" ? error : String(error);
+
+  return fallback;
 };
 
 export const requestJson = async (
@@ -159,11 +120,17 @@ export const requestJson = async (
     },
   });
 
-  const payload = await readJson(response);
+  const payload = await readPayload(response);
   if (!response.ok) {
     const message = extractErrorMessage(payload, `status ${response.status}`);
     throw new Error(`API request failed: ${message}`);
   }
 
-  return payload;
+  if (payload.type !== "json") {
+    throw new Error(
+      `API request failed: Expected JSON response but received ${payload.type}`,
+    );
+  }
+
+  return payload.body;
 };

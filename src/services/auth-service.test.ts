@@ -4,6 +4,7 @@ import {
   type AccessTokenResult,
   ensureSupabaseConfig,
   parseSignupFragment,
+  toAuthenticatedAccessTokenResult,
 } from "./auth-service.js";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -95,5 +96,66 @@ describe("parseSignupFragment", () => {
     expect(() => {
       parseSignupFragment(fragment);
     }).toThrow("Confirmation URL is missing access_token.");
+  });
+});
+
+describe("toAuthenticatedAccessTokenResult", () => {
+  const encodeSegment = (value: unknown): string => {
+    return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+  };
+
+  const header = encodeSegment({ alg: "ES256", typ: "JWT" });
+
+  const buildToken = (payload: Record<string, unknown>): string => {
+    const payloadSegment = encodeSegment(payload);
+    const signature = encodeSegment({ sig: "signature" });
+    return `${header}.${payloadSegment}.${signature}`;
+  };
+
+  it("returns enriched access token details when payload is valid", () => {
+    const epoch = Math.floor(Date.now() / 1000);
+    const payload = {
+      sub: "user-123",
+      email: "user@example.com",
+      iss: "https://example.supabase.co/auth/v1",
+      aud: "authenticated",
+      role: "authenticated",
+      exp: epoch + 3600,
+      iat: epoch,
+    };
+    const accessToken = buildToken(payload);
+    const input: AccessTokenResult = {
+      accessToken,
+      expiresIn: 3600,
+      tokenType: "bearer",
+    };
+
+    const result = toAuthenticatedAccessTokenResult(input);
+
+    expect(result.userId).toBe("user-123");
+    expect(result.token.email).toBe("user@example.com");
+    expect(result.accessToken).toBe(accessToken);
+  });
+
+  it("throws when the JWT payload is missing required subject", () => {
+    const epoch = Math.floor(Date.now() / 1000);
+    const payload = {
+      email: "user@example.com",
+      iss: "https://example.supabase.co/auth/v1",
+      aud: "authenticated",
+      role: "authenticated",
+      exp: epoch + 3600,
+      iat: epoch,
+    };
+    const accessToken = buildToken(payload);
+    const input: AccessTokenResult = {
+      accessToken,
+      expiresIn: 3600,
+      tokenType: "bearer",
+    };
+
+    expect(() => {
+      toAuthenticatedAccessTokenResult(input);
+    }).toThrow("Access token payload structure is invalid.");
   });
 });

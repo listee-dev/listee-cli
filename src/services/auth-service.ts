@@ -455,6 +455,37 @@ export const getAccessToken = async (
   };
 };
 
+export type AuthenticatedAccessTokenResult = AccessTokenResult & {
+  userId: string;
+  token: SupabaseToken;
+};
+
+export const toAuthenticatedAccessTokenResult = (
+  tokenResult: AccessTokenResult,
+): AuthenticatedAccessTokenResult => {
+  const accessToken = tokenResult.accessToken.trim();
+  if (accessToken.length === 0) {
+    throw new Error("Access token is empty.");
+  }
+
+  const token = decodeSupabaseToken(accessToken);
+  const userId = extractSubjectFromTokenPayload(token);
+
+  return {
+    ...tokenResult,
+    accessToken,
+    userId,
+    token,
+  };
+};
+
+export const getAuthenticatedAccessToken = async (
+  email?: string,
+): Promise<AuthenticatedAccessTokenResult> => {
+  const tokenResult = await getAccessToken(email);
+  return toAuthenticatedAccessTokenResult(tokenResult);
+};
+
 export const logout = async (): Promise<number> => {
   return deleteAllStoredCredentials();
 };

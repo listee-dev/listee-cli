@@ -14,8 +14,8 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@listee/auth": "^0.3.0",
-    "@listee/types": "^0.3.0",
+    "@listee/auth": "^0.4.0",
+    "@listee/types": "^0.4.0",
     "@napi-rs/keyring": "^1.2.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.5"
