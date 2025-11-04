@@ -24,7 +24,7 @@
 - Keep comments purposeful; avoid restating the obvious. Add brief context only for non-trivial flows (e.g., token refresh sequencing).
 
 ## Supabase & Secrets Handling
-- Read `SUPABASE_URL` and `SUPABASE_ANON_KEY` from environment variables or `.env`; never hardcode credentials.
+- Read `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` from environment variables or `.env`; never hardcode credentials.
 - Keytar service name defaults to `listee-cli`. If a feature demands overrides, surface them via env vars or CLI flags.
 
 ## Safety & Review Protocol

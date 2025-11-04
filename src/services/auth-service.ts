@@ -5,6 +5,7 @@ import {
 } from "@listee/auth";
 import type { SupabaseToken } from "@listee/types";
 import { AsyncEntry, findCredentials } from "@napi-rs/keyring";
+import { checkEnv, EnvValidationError, getEnv } from "../env.js";
 import type {
   AccessTokenResult,
   AuthStatus,
@@ -94,44 +95,70 @@ const listStoredCredentials = (service: string): StoredCredential[] => {
 };
 
 const getSupabaseUrl = (): URL => {
-  const rawUrl = process.env.SUPABASE_URL;
-  if (rawUrl === undefined || rawUrl.trim().length === 0) {
-    throw new Error(
-      "SUPABASE_URL is not set. Please configure the environment variable before continuing.",
-    );
+  try {
+    const env = getEnv();
+    const rawUrl = env.SUPABASE_URL;
+    if (rawUrl === undefined) {
+      throw new Error(
+        "SUPABASE_URL is not set. Please configure the environment variable before continuing.",
+      );
+    }
+    return new URL(rawUrl);
+  } catch (error) {
+    if (error instanceof EnvValidationError) {
+      const supabaseIssue = error.issues.find((issue) => {
+        return issue.path.join(".") === "SUPABASE_URL";
+      });
+      if (supabaseIssue !== undefined) {
+        const message = supabaseIssue.message.includes(
+          "expected string, received undefined",
+        )
+          ? "SUPABASE_URL is not set. Please configure the environment variable before continuing."
+          : supabaseIssue.message;
+        throw new Error(message);
+      }
+    }
+    throw error;
   }
-
-  return new URL(rawUrl.trim());
 };
 
 const getSupabasePublishableKey = (): string => {
-  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (publishableKey !== undefined && publishableKey.trim().length > 0) {
-    return publishableKey.trim();
+  try {
+    const env = getEnv();
+    const publishableKey = env.SUPABASE_PUBLISHABLE_KEY;
+    if (publishableKey === undefined) {
+      throw new Error(
+        "SUPABASE_PUBLISHABLE_KEY is not set. Please configure the environment variable before continuing.",
+      );
+    }
+    return publishableKey;
+  } catch (error) {
+    if (error instanceof EnvValidationError) {
+      const publishableIssue = error.issues.find((issue) => {
+        return issue.path.join(".") === "SUPABASE_PUBLISHABLE_KEY";
+      });
+      if (publishableIssue !== undefined) {
+        const message = publishableIssue.message.includes(
+          "expected string, received undefined",
+        )
+          ? "SUPABASE_PUBLISHABLE_KEY is not set. Please configure the environment variable before continuing."
+          : publishableIssue.message;
+        throw new Error(message);
+      }
+    }
+    throw error;
   }
-
-  const legacyAnonKey = process.env.SUPABASE_ANON_KEY;
-  if (legacyAnonKey !== undefined && legacyAnonKey.trim().length > 0) {
-    return legacyAnonKey.trim();
-  }
-
-  throw new Error(
-    "SUPABASE_PUBLISHABLE_KEY is not set. Please configure the environment variable before continuing.",
-  );
 };
 
 export const ensureSupabaseConfig = (): void => {
+  checkEnv();
   void getSupabaseUrl();
   void getSupabasePublishableKey();
 };
 
 const getKeychainServiceName = (): string => {
-  const override = process.env.LISTEE_CLI_KEYCHAIN_SERVICE;
-  if (override !== undefined && override.trim().length > 0) {
-    return override.trim();
-  }
-
-  return DEFAULT_SERVICE_NAME;
+  const env = getEnv();
+  return env.LISTEE_CLI_KEYCHAIN_SERVICE ?? DEFAULT_SERVICE_NAME;
 };
 
 const readJson = async (response: Response): Promise<unknown> => {

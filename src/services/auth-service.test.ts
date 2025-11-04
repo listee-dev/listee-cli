@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { Buffer } from "node:buffer";
+import { resetEnvCache } from "../env.js";
 import {
   type AccessTokenResult,
   ensureSupabaseConfig,
@@ -9,8 +10,13 @@ import {
 
 const ORIGINAL_ENV = { ...process.env };
 
+if (ORIGINAL_ENV.LISTEE_API_URL === undefined) {
+  ORIGINAL_ENV.LISTEE_API_URL = "https://api.example.dev";
+}
+
 const resetEnv = (): void => {
   process.env = { ...ORIGINAL_ENV };
+  resetEnvCache();
 };
 
 beforeEach(resetEnv);
@@ -26,10 +32,9 @@ describe("ensureSupabaseConfig", () => {
     }).toThrow("SUPABASE_URL is not set");
   });
 
-  it("throws when publishable key and legacy anon key are missing", () => {
+  it("throws when publishable key is missing", () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     delete process.env.SUPABASE_PUBLISHABLE_KEY;
-    delete process.env.SUPABASE_ANON_KEY;
 
     expect(() => {
       ensureSupabaseConfig();
@@ -39,14 +44,6 @@ describe("ensureSupabaseConfig", () => {
   it("does not throw when publishable key is set", () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_PUBLISHABLE_KEY = "pk_test";
-
-    expect(() => ensureSupabaseConfig()).not.toThrow();
-  });
-
-  it("allows fallback to legacy anon key", () => {
-    process.env.SUPABASE_URL = "https://example.supabase.co";
-    delete process.env.SUPABASE_PUBLISHABLE_KEY;
-    process.env.SUPABASE_ANON_KEY = "anon_key";
 
     expect(() => ensureSupabaseConfig()).not.toThrow();
   });

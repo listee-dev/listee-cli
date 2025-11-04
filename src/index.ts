@@ -1,8 +1,10 @@
-import "dotenv/config";
 import { Command } from "commander";
 import { registerAuthCommand } from "./commands/auth.js";
 import { registerCategoryCommand } from "./commands/categories.js";
 import { registerTaskCommand } from "./commands/tasks.js";
+import { checkEnv } from "./env.js";
+
+checkEnv();
 
 const program = new Command();
 

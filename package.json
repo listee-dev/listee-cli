@@ -17,8 +17,10 @@
     "@listee/auth": "^0.4.0",
     "@listee/types": "^0.4.0",
     "@napi-rs/keyring": "^1.2.0",
+    "@t3-oss/env-core": "^0.13.8",
     "commander": "^12.1.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",

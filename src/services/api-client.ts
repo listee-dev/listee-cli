@@ -1,3 +1,4 @@
+import { EnvValidationError, getEnv } from "../env.js";
 import { getAuthenticatedAccessToken } from "./auth-service.js";
 
 type AuthenticatedContext = {
@@ -10,19 +11,26 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
 };
 
-const getEnvValue = (key: string): string => {
-  const raw = process.env[key];
-  if (raw === undefined || raw.trim().length === 0) {
-    throw new Error(
-      `${key} is not set. Please configure the environment variable before continuing.`,
-    );
-  }
-  return raw.trim();
-};
-
 const getApiBaseUrl = (): URL => {
-  const rawUrl = getEnvValue("LISTEE_API_URL");
-  return new URL(rawUrl);
+  try {
+    const env = getEnv();
+    return new URL(env.LISTEE_API_URL);
+  } catch (error) {
+    if (error instanceof EnvValidationError) {
+      const listeeApiIssue = error.issues.find((issue) => {
+        return issue.path.join(".") === "LISTEE_API_URL";
+      });
+      if (listeeApiIssue !== undefined) {
+        const message = listeeApiIssue.message.includes(
+          "expected string, received undefined",
+        )
+          ? "LISTEE_API_URL is not set. Please configure the environment variable before continuing."
+          : listeeApiIssue.message;
+        throw new Error(message);
+      }
+    }
+    throw error;
+  }
 };
 
 type ParsedPayload =

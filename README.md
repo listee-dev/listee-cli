@@ -5,7 +5,7 @@ Official command-line interface for Listee — manage authentication, categories
 ## Requirements
 - Bun 1.2.22 (`bun --version`)
 - Node.js 20+ (runtime for the compiled CLI)
-- Supabase project credentials (`SUPABASE_URL`, `SUPABASE_ANON_KEY`)
+- Supabase project credentials (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`)
 
 ## Installation
 ```bash
@@ -17,12 +17,9 @@ Create a `.env` file or export environment variables before running commands:
 ```bash
 export SUPABASE_URL="https://your-project.supabase.co"
 export SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
-# legacy fallback (deprecated, only if publishable key is unavailable)
-# export SUPABASE_ANON_KEY="your-anon-key"
 export LISTEE_API_URL="https://api.your-listee-instance.dev"
 # optional: override the Keytar service name
 export LISTEE_CLI_KEYCHAIN_SERVICE="listee-cli"
-# authorization headers always use Supabase access tokens (JWT)
 ```
 Never commit secrets; the repo defaults to reading from the process environment.
 
