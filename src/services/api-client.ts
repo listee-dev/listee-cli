@@ -1,60 +1,14 @@
-import { EnvValidationError, getEnv } from "../env.js";
+import {
+  buildListeeApiUrl,
+  extractApiErrorMessage,
+  readApiPayload,
+} from "./api-base.js";
 import { getAuthenticatedAccessToken } from "./auth-service.js";
 
 type AuthenticatedContext = {
   readonly accessToken: string;
   readonly userId: string;
   readonly authorizationValue: string;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null;
-};
-
-const getApiBaseUrl = (): URL => {
-  try {
-    const env = getEnv();
-    return new URL(env.LISTEE_API_URL);
-  } catch (error) {
-    if (error instanceof EnvValidationError) {
-      const listeeApiIssue = error.issues.find((issue) => {
-        return issue.path.join(".") === "LISTEE_API_URL";
-      });
-      if (listeeApiIssue !== undefined) {
-        const message = listeeApiIssue.message.includes(
-          "expected string, received undefined",
-        )
-          ? "LISTEE_API_URL is not set. Please configure the environment variable before continuing."
-          : listeeApiIssue.message;
-        throw new Error(message);
-      }
-    }
-    throw error;
-  }
-};
-
-type ParsedPayload =
-  | { type: "json"; body: unknown }
-  | { type: "text"; body: string }
-  | { type: "empty"; body: null };
-
-const readPayload = async (response: Response): Promise<ParsedPayload> => {
-  const contentType = response.headers.get("content-type") ?? "";
-  const text = await response.text();
-  if (text.trim().length === 0) {
-    return { type: "empty", body: null };
-  }
-
-  if (contentType.toLowerCase().includes("application/json")) {
-    try {
-      return { type: "json", body: JSON.parse(text) };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "unknown error";
-      throw new Error(`Failed to parse API response as JSON: ${message}`);
-    }
-  }
-
-  return { type: "text", body: text };
 };
 
 export const createAuthenticatedContext = async (
@@ -79,39 +33,7 @@ const buildHeaders = (authorizationValue: string): HeadersInit => {
 };
 
 const buildUrl = (path: string): URL => {
-  if (!path.startsWith("/")) {
-    throw new Error("API path must start with '/' .");
-  }
-  const base = getApiBaseUrl();
-  const baseHref = base.href.endsWith("/") ? base.href : `${base.href}/`;
-  const normalizedPath = path.replace(/^\//u, "");
-  return new URL(normalizedPath, baseHref);
-};
-
-const extractErrorMessage = (
-  payload: ParsedPayload,
-  fallback: string,
-): string => {
-  if (payload.type === "json") {
-    const body = payload.body;
-    if (isRecord(body)) {
-      const error = body.error;
-      if (error !== undefined) {
-        return typeof error === "string" ? error : String(error);
-      }
-    }
-    return fallback;
-  }
-
-  if (payload.type === "text") {
-    const snippet =
-      payload.body.length > 200
-        ? `${payload.body.slice(0, 200)}…`
-        : payload.body;
-    return `${fallback}; raw response: ${snippet}`;
-  }
-
-  return fallback;
+  return buildListeeApiUrl(path);
 };
 
 export const requestJson = async (
@@ -128,9 +50,12 @@ export const requestJson = async (
     },
   });
 
-  const payload = await readPayload(response);
+  const payload = await readApiPayload(response);
   if (!response.ok) {
-    const message = extractErrorMessage(payload, `status ${response.status}`);
+    const message = extractApiErrorMessage(
+      payload,
+      `status ${response.status}`,
+    );
     throw new Error(`API request failed: ${message}`);
   }
 

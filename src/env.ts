@@ -28,8 +28,6 @@ const optionalNonEmptyString = nonEmptyString.optional();
 const buildEnv = () => {
   return createEnv({
     server: {
-      SUPABASE_URL: urlString,
-      SUPABASE_PUBLISHABLE_KEY: nonEmptyString,
       LISTEE_API_URL: urlString,
       LISTEE_CLI_KEYCHAIN_SERVICE: optionalNonEmptyString,
     },
@@ -88,14 +86,6 @@ export const resetEnvCache = (): void => {
 
 const describeIssue = (issue: EnvIssue): string => {
   const path = issue.path.join(".");
-
-  if (path === "SUPABASE_URL") {
-    return "SUPABASE_URL is not set. Please configure the environment variable before continuing.";
-  }
-
-  if (path === "SUPABASE_PUBLISHABLE_KEY") {
-    return "SUPABASE_PUBLISHABLE_KEY is not set. Please configure the environment variable before continuing.";
-  }
 
   if (path === "LISTEE_API_URL") {
     return "LISTEE_API_URL is not set. Please configure the environment variable before continuing.";

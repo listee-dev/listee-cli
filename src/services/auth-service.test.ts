@@ -3,7 +3,7 @@ import { Buffer } from "node:buffer";
 import { resetEnvCache } from "../env.js";
 import {
   type AccessTokenResult,
-  ensureSupabaseConfig,
+  ensureListeeApiConfig,
   parseSignupFragment,
   toAuthenticatedAccessTokenResult,
 } from "./auth-service.js";
@@ -22,30 +22,19 @@ const resetEnv = (): void => {
 beforeEach(resetEnv);
 afterEach(resetEnv);
 
-describe("ensureSupabaseConfig", () => {
-  it("throws when SUPABASE_URL is missing", () => {
-    delete process.env.SUPABASE_URL;
-    process.env.SUPABASE_PUBLISHABLE_KEY = "pk_test";
+describe("ensureListeeApiConfig", () => {
+  it("throws when LISTEE_API_URL is missing", () => {
+    delete process.env.LISTEE_API_URL;
 
     expect(() => {
-      ensureSupabaseConfig();
-    }).toThrow("SUPABASE_URL is not set");
+      ensureListeeApiConfig();
+    }).toThrow("LISTEE_API_URL is not set");
   });
 
-  it("throws when publishable key is missing", () => {
-    process.env.SUPABASE_URL = "https://example.supabase.co";
-    delete process.env.SUPABASE_PUBLISHABLE_KEY;
+  it("does not throw when LISTEE_API_URL is set", () => {
+    process.env.LISTEE_API_URL = "https://api.example.dev";
 
-    expect(() => {
-      ensureSupabaseConfig();
-    }).toThrow("SUPABASE_PUBLISHABLE_KEY is not set");
-  });
-
-  it("does not throw when publishable key is set", () => {
-    process.env.SUPABASE_URL = "https://example.supabase.co";
-    process.env.SUPABASE_PUBLISHABLE_KEY = "pk_test";
-
-    expect(() => ensureSupabaseConfig()).not.toThrow();
+    expect(() => ensureListeeApiConfig()).not.toThrow();
   });
 });
 

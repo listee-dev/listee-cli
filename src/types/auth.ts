@@ -5,14 +5,6 @@ export type SupabaseTokenResponse = {
   expires_in: number;
 };
 
-export type SupabaseErrorPayload = {
-  error?: string;
-  error_description?: string;
-  msg?: string;
-  message?: string;
-  status?: number;
-};
-
 export type StoredCredential = {
   account: string;
   refreshToken: string;

@@ -1,11 +1,11 @@
 # listee-cli
 
-Official command-line interface for Listee — manage authentication, categories, and tasks directly from your terminal. The MVP focuses on Supabase email/password flows (`signup`, `login`, `logout`, `status`).
+Official command-line interface for Listee — manage authentication, categories, and tasks directly from your terminal via the Listee API (`signup`, `login`, `logout`, `status`).
 
 ## Requirements
 - Bun 1.2.22 (`bun --version`)
 - Node.js 20+ (runtime for the compiled CLI)
-- Supabase project credentials (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`)
+- Listee API base URL (`LISTEE_API_URL`)
 
 ## Installation
 ```bash
@@ -15,8 +15,6 @@ bun install
 ## Configuration
 Create a `.env` file or export environment variables before running commands:
 ```bash
-export SUPABASE_URL="https://your-project.supabase.co"
-export SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
 export LISTEE_API_URL="https://api.your-listee-instance.dev"
 # optional: override the Keytar service name
 export LISTEE_CLI_KEYCHAIN_SERVICE="listee-cli"

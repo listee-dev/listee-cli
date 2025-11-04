@@ -5,15 +5,19 @@ import {
 } from "@listee/auth";
 import type { SupabaseToken } from "@listee/types";
 import { AsyncEntry, findCredentials } from "@napi-rs/keyring";
-import { checkEnv, EnvValidationError, getEnv } from "../env.js";
+import { checkEnv, getEnv } from "../env.js";
 import type {
   AccessTokenResult,
   AuthStatus,
   SignupRedirect,
   StoredCredential,
-  SupabaseErrorPayload,
   SupabaseTokenResponse,
 } from "../types/auth.js";
+import {
+  buildListeeApiUrl,
+  extractApiErrorMessage,
+  readApiPayload,
+} from "./api-base.js";
 
 const DEFAULT_SERVICE_NAME = "listee-cli";
 let cachedAccountProvisioner: AccountProvisioner | null = null;
@@ -35,23 +39,6 @@ const isString = (value: unknown): value is string => {
 
 const isNumber = (value: unknown): value is number => {
   return typeof value === "number" && Number.isFinite(value);
-};
-
-const isSupabaseErrorPayload = (
-  value: unknown,
-): value is SupabaseErrorPayload => {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  const possibleFields = [
-    "error",
-    "error_description",
-    "msg",
-    "message",
-    "status",
-  ];
-  return possibleFields.some((field) => field in value);
 };
 
 const isSupabaseTokenResponse = (
@@ -94,66 +81,9 @@ const listStoredCredentials = (service: string): StoredCredential[] => {
   }
 };
 
-const getSupabaseUrl = (): URL => {
-  try {
-    const env = getEnv();
-    const rawUrl = env.SUPABASE_URL;
-    if (rawUrl === undefined) {
-      throw new Error(
-        "SUPABASE_URL is not set. Please configure the environment variable before continuing.",
-      );
-    }
-    return new URL(rawUrl);
-  } catch (error) {
-    if (error instanceof EnvValidationError) {
-      const supabaseIssue = error.issues.find((issue) => {
-        return issue.path.join(".") === "SUPABASE_URL";
-      });
-      if (supabaseIssue !== undefined) {
-        const message = supabaseIssue.message.includes(
-          "expected string, received undefined",
-        )
-          ? "SUPABASE_URL is not set. Please configure the environment variable before continuing."
-          : supabaseIssue.message;
-        throw new Error(message);
-      }
-    }
-    throw error;
-  }
-};
-
-const getSupabasePublishableKey = (): string => {
-  try {
-    const env = getEnv();
-    const publishableKey = env.SUPABASE_PUBLISHABLE_KEY;
-    if (publishableKey === undefined) {
-      throw new Error(
-        "SUPABASE_PUBLISHABLE_KEY is not set. Please configure the environment variable before continuing.",
-      );
-    }
-    return publishableKey;
-  } catch (error) {
-    if (error instanceof EnvValidationError) {
-      const publishableIssue = error.issues.find((issue) => {
-        return issue.path.join(".") === "SUPABASE_PUBLISHABLE_KEY";
-      });
-      if (publishableIssue !== undefined) {
-        const message = publishableIssue.message.includes(
-          "expected string, received undefined",
-        )
-          ? "SUPABASE_PUBLISHABLE_KEY is not set. Please configure the environment variable before continuing."
-          : publishableIssue.message;
-        throw new Error(message);
-      }
-    }
-    throw error;
-  }
-};
-
-export const ensureSupabaseConfig = (): void => {
+export const ensureListeeApiConfig = (): void => {
   checkEnv();
-  void getSupabaseUrl();
-  void getSupabasePublishableKey();
+  void getEnv().LISTEE_API_URL;
 };
 
 const getKeychainServiceName = (): string => {
@@ -161,49 +91,54 @@ const getKeychainServiceName = (): string => {
   return env.LISTEE_CLI_KEYCHAIN_SERVICE ?? DEFAULT_SERVICE_NAME;
 };
 
-const readJson = async (response: Response): Promise<unknown> => {
-  const raw = await response.text();
-  if (raw.trim().length === 0) {
-    return null;
+type AuthRequestBody = Record<string, unknown>;
+
+const requestAuthJson = async (
+  path: string,
+  body: AuthRequestBody,
+): Promise<unknown> => {
+  const url = buildListeeApiUrl(path);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await readApiPayload(response);
+  if (!response.ok) {
+    const message = extractApiErrorMessage(
+      payload,
+      `status ${response.status}`,
+    );
+    throw new Error(`Listee API auth request failed: ${message}`);
   }
 
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to parse Supabase response: ${error.message}`);
-    }
+  if (payload.type !== "json") {
     throw new Error(
-      "Failed to parse Supabase response due to an unknown error.",
+      `Listee API auth request expected JSON but received ${payload.type}`,
     );
   }
+
+  return payload.body;
 };
 
-const formatSupabaseError = (payload: unknown, status: number): string => {
-  if (isSupabaseErrorPayload(payload)) {
-    const { error, error_description: description, msg, message } = payload;
-    const details = [error, description, msg, message]
-      .filter(
-        (part) =>
-          part !== undefined && isString(part) && part.trim().length > 0,
-      )
-      .join(": ");
-
-    if (details.length > 0) {
-      return details;
-    }
+const toSupabaseTokenResponse = (payload: unknown): SupabaseTokenResponse => {
+  if (isSupabaseTokenResponse(payload)) {
+    return payload;
   }
 
-  return `Supabase request failed with status ${status}`;
-};
+  if (
+    isRecord(payload) &&
+    "data" in payload &&
+    isSupabaseTokenResponse((payload as { data: unknown }).data)
+  ) {
+    return (payload as { data: SupabaseTokenResponse }).data;
+  }
 
-const buildSupabaseHeaders = (): Record<string, string> => {
-  const publishableKey = getSupabasePublishableKey();
-  return {
-    "Content-Type": "application/json",
-    apikey: publishableKey,
-    Authorization: `Bearer ${publishableKey}`,
-  };
+  throw new Error("Listee API auth response did not include token details.");
 };
 
 const getFragmentParams = (fragment: string): URLSearchParams => {
@@ -391,59 +326,37 @@ const deleteAllStoredCredentials = async (): Promise<number> => {
   return removed;
 };
 
-const requestSupabase = async (
-  path: string,
-  body: Record<string, unknown>,
-): Promise<Response> => {
-  const url = new URL(path, getSupabaseUrl());
-  return fetch(url, {
-    method: "POST",
-    headers: buildSupabaseHeaders(),
-    body: JSON.stringify(body),
-  });
-};
-
 export const signup = async (
   email: string,
   password: string,
   redirectUrl?: string,
 ): Promise<void> => {
-  const path =
-    redirectUrl === undefined
-      ? "auth/v1/signup"
-      : `auth/v1/signup?redirect_to=${encodeURIComponent(redirectUrl)}`;
-  const response = await requestSupabase(path, { email, password });
-
-  if (!response.ok) {
-    const payload = await readJson(response);
-    throw new Error(formatSupabaseError(payload, response.status));
+  const requestBody: AuthRequestBody = {
+    email,
+    password,
+  };
+  if (redirectUrl !== undefined) {
+    requestBody.redirectUrl = redirectUrl;
   }
+  await requestAuthJson("/auth/signup", requestBody);
 };
 
 export const login = async (
   email: string,
   password: string,
 ): Promise<AccessTokenResult> => {
-  const response = await requestSupabase("auth/v1/token?grant_type=password", {
+  const payload = await requestAuthJson("/auth/login", {
     email,
     password,
   });
+  const tokenResponse = toSupabaseTokenResponse(payload);
 
-  const payload = await readJson(response);
-  if (!response.ok) {
-    throw new Error(formatSupabaseError(payload, response.status));
-  }
-
-  if (!isSupabaseTokenResponse(payload)) {
-    throw new Error("Unexpected response from Supabase during login.");
-  }
-
-  await storeRefreshToken(email, payload.refresh_token);
+  await storeRefreshToken(email, tokenResponse.refresh_token);
 
   return {
-    accessToken: payload.access_token,
-    expiresIn: payload.expires_in,
-    tokenType: payload.token_type,
+    accessToken: tokenResponse.access_token,
+    expiresIn: tokenResponse.expires_in,
+    tokenType: tokenResponse.token_type,
   };
 };
 
@@ -455,30 +368,17 @@ export const getAccessToken = async (
     throw new Error("No stored refresh token found. Please log in first.");
   }
 
-  const response = await requestSupabase(
-    "auth/v1/token?grant_type=refresh_token",
-    {
-      refresh_token: credential.refreshToken,
-    },
-  );
+  const payload = await requestAuthJson("/auth/token", {
+    refreshToken: credential.refreshToken,
+  });
+  const tokenResponse = toSupabaseTokenResponse(payload);
 
-  const payload = await readJson(response);
-  if (!response.ok) {
-    throw new Error(formatSupabaseError(payload, response.status));
-  }
-
-  if (!isSupabaseTokenResponse(payload)) {
-    throw new Error(
-      "Unexpected response from Supabase while refreshing the session.",
-    );
-  }
-
-  await storeRefreshToken(credential.account, payload.refresh_token);
+  await storeRefreshToken(credential.account, tokenResponse.refresh_token);
 
   return {
-    accessToken: payload.access_token,
-    expiresIn: payload.expires_in,
-    tokenType: payload.token_type,
+    accessToken: tokenResponse.access_token,
+    expiresIn: tokenResponse.expires_in,
+    tokenType: tokenResponse.token_type,
   };
 };
 

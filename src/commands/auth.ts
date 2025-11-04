@@ -5,7 +5,7 @@ import { createInterface } from "node:readline";
 import type { Command } from "commander";
 import {
   completeSignupFromFragment,
-  ensureSupabaseConfig,
+  ensureListeeApiConfig,
   login,
   logout,
   signup,
@@ -339,7 +339,7 @@ const printStatus = (result: AuthStatus): void => {
 };
 
 const loginAction = async (options: EmailOption): Promise<void> => {
-  ensureSupabaseConfig();
+  ensureListeeApiConfig();
   const email = ensureEmail(options.email);
   const password = await promptHiddenInput("Password: ");
   await login(email, password);
@@ -347,7 +347,7 @@ const loginAction = async (options: EmailOption): Promise<void> => {
 };
 
 const signupAction = async (options: EmailOption): Promise<void> => {
-  ensureSupabaseConfig();
+  ensureListeeApiConfig();
   const email = ensureEmail(options.email);
   const password = await promptHiddenInput("Password: ");
   const loopback = await startLoopbackServer();
@@ -393,13 +393,11 @@ const statusAction = async (): Promise<void> => {
 export const registerAuthCommand = (program: Command): void => {
   const auth = program
     .command("auth")
-    .description("Manage Supabase authentication for Listee.");
+    .description("Manage Listee API authentication for Listee.");
 
   auth
     .command("signup")
-    .description(
-      "Sign up for a new Listee account via Supabase email/password.",
-    )
+    .description("Sign up for a new Listee account via the Listee API.")
     .requiredOption("--email <email>", "Email address to register")
     .action(
       execute(async (options: EmailOption) => {
@@ -410,7 +408,7 @@ export const registerAuthCommand = (program: Command): void => {
   auth
     .command("login")
     .description(
-      "Authenticate with Supabase using email/password and store refresh token in keychain.",
+      "Authenticate with the Listee API using email/password and store refresh token in keychain.",
     )
     .requiredOption("--email <email>", "Email address to log in")
     .action(
