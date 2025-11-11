@@ -3,15 +3,15 @@ import {
   type AccountProvisioner,
   createAccountProvisioner,
 } from "@listee/auth";
-import type { SupabaseToken } from "@listee/types";
 import { AsyncEntry, findCredentials } from "@napi-rs/keyring";
 import { checkEnv, getEnv } from "../env.js";
 import type {
   AccessTokenResult,
   AuthStatus,
+  AuthTokenClaims,
+  AuthTokenResponse,
   SignupRedirect,
   StoredCredential,
-  SupabaseTokenResponse,
 } from "../types/auth.js";
 import {
   buildListeeApiUrl,
@@ -41,17 +41,15 @@ const isNumber = (value: unknown): value is number => {
   return typeof value === "number" && Number.isFinite(value);
 };
 
-const isSupabaseTokenResponse = (
-  value: unknown,
-): value is SupabaseTokenResponse => {
+const isAuthTokenResponse = (value: unknown): value is AuthTokenResponse => {
   if (!isRecord(value)) {
     return false;
   }
 
-  const accessToken = value.access_token;
-  const refreshToken = value.refresh_token;
-  const tokenType = value.token_type;
-  const expiresIn = value.expires_in;
+  const accessToken = value.accessToken;
+  const refreshToken = value.refreshToken;
+  const tokenType = value.tokenType;
+  const expiresIn = value.expiresIn;
 
   return (
     isString(accessToken) &&
@@ -125,17 +123,17 @@ const requestAuthJson = async (
   return payload.body;
 };
 
-const toSupabaseTokenResponse = (payload: unknown): SupabaseTokenResponse => {
-  if (isSupabaseTokenResponse(payload)) {
+const toAuthTokenResponse = (payload: unknown): AuthTokenResponse => {
+  if (isAuthTokenResponse(payload)) {
     return payload;
   }
 
   if (
     isRecord(payload) &&
     "data" in payload &&
-    isSupabaseTokenResponse((payload as { data: unknown }).data)
+    isAuthTokenResponse((payload as { data: unknown }).data)
   ) {
-    return (payload as { data: SupabaseTokenResponse }).data;
+    return (payload as { data: AuthTokenResponse }).data;
   }
 
   throw new Error("Listee API auth response did not include token details.");
@@ -170,7 +168,7 @@ const decodeJwtPayload = (token: string): unknown => {
   }
 };
 
-const isSupabaseTokenPayload = (payload: unknown): payload is SupabaseToken => {
+const isAuthTokenPayload = (payload: unknown): payload is AuthTokenClaims => {
   if (!isRecord(payload)) {
     return false;
   }
@@ -201,16 +199,16 @@ const isSupabaseTokenPayload = (payload: unknown): payload is SupabaseToken => {
   return true;
 };
 
-const decodeSupabaseToken = (token: string): SupabaseToken => {
+const decodeAuthToken = (token: string): AuthTokenClaims => {
   const payload = decodeJwtPayload(token);
-  if (!isSupabaseTokenPayload(payload)) {
+  if (!isAuthTokenPayload(payload)) {
     throw new Error("Access token payload structure is invalid.");
   }
 
   return payload;
 };
 
-const extractSubjectFromTokenPayload = (payload: SupabaseToken): string => {
+const extractSubjectFromTokenPayload = (payload: AuthTokenClaims): string => {
   const subjectValue = payload.sub;
   if (!isString(subjectValue) || subjectValue.trim().length === 0) {
     throw new Error("Access token payload did not include a user id.");
@@ -220,7 +218,7 @@ const extractSubjectFromTokenPayload = (payload: SupabaseToken): string => {
 };
 
 const extractEmailFromAccessToken = (token: string): string => {
-  const payload = decodeSupabaseToken(token);
+  const payload = decodeAuthToken(token);
   const email = payload.email;
   if (!isString(email) || email.trim().length === 0) {
     throw new Error("Access token payload did not include an email.");
@@ -349,14 +347,14 @@ export const login = async (
     email,
     password,
   });
-  const tokenResponse = toSupabaseTokenResponse(payload);
+  const tokenResponse = toAuthTokenResponse(payload);
 
-  await storeRefreshToken(email, tokenResponse.refresh_token);
+  await storeRefreshToken(email, tokenResponse.refreshToken);
 
   return {
-    accessToken: tokenResponse.access_token,
-    expiresIn: tokenResponse.expires_in,
-    tokenType: tokenResponse.token_type,
+    accessToken: tokenResponse.accessToken,
+    expiresIn: tokenResponse.expiresIn,
+    tokenType: tokenResponse.tokenType,
   };
 };
 
@@ -371,20 +369,20 @@ export const getAccessToken = async (
   const payload = await requestAuthJson("/auth/token", {
     refreshToken: credential.refreshToken,
   });
-  const tokenResponse = toSupabaseTokenResponse(payload);
+  const tokenResponse = toAuthTokenResponse(payload);
 
-  await storeRefreshToken(credential.account, tokenResponse.refresh_token);
+  await storeRefreshToken(credential.account, tokenResponse.refreshToken);
 
   return {
-    accessToken: tokenResponse.access_token,
-    expiresIn: tokenResponse.expires_in,
-    tokenType: tokenResponse.token_type,
+    accessToken: tokenResponse.accessToken,
+    expiresIn: tokenResponse.expiresIn,
+    tokenType: tokenResponse.tokenType,
   };
 };
 
 export type AuthenticatedAccessTokenResult = AccessTokenResult & {
   userId: string;
-  token: SupabaseToken;
+  token: AuthTokenClaims;
 };
 
 export const toAuthenticatedAccessTokenResult = (
@@ -395,7 +393,7 @@ export const toAuthenticatedAccessTokenResult = (
     throw new Error("Access token is empty.");
   }
 
-  const token = decodeSupabaseToken(accessToken);
+  const token = decodeAuthToken(accessToken);
   const userId = extractSubjectFromTokenPayload(token);
 
   return {
@@ -443,7 +441,7 @@ export const completeSignupFromFragment = async (
 const provisionSignupAccount = async (
   result: SignupRedirect,
 ): Promise<void> => {
-  const tokenPayload = decodeSupabaseToken(result.accessToken);
+  const tokenPayload = decodeAuthToken(result.accessToken);
   const userId = extractSubjectFromTokenPayload(tokenPayload);
   const provisioner = getAccountProvisioner();
 

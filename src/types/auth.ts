@@ -1,8 +1,10 @@
-export type SupabaseTokenResponse = {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expires_in: number;
+export type { SupabaseToken as AuthTokenClaims } from "@listee/types";
+
+export type AuthTokenResponse = {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  expiresIn: number;
 };
 
 export type StoredCredential = {
