@@ -5,7 +5,7 @@
 - Agents must follow the Listee org conventions observed in sibling repos (`listee-libs`, `listee-ci`) and keep changes minimal and well-justified.
 
 ## Repository Layout Awareness
-- Source of truth: `src/index.ts` wires Commander, `src/commands/` hosts CLI handlers, and `src/services/` stores Supabase-facing logic. Tests will expand under `tests/`.
+- Source of truth: `src/index.ts` wires Commander, `src/commands/` hosts CLI handlers, and `src/services/` stores Listee API-facing logic. Tests will expand under `tests/`.
 - Keep generated output in `dist/` (never commit). Respect any existing files—do not alter unrelated modules.
 - When referencing other org repos, treat them as read-only unless explicitly instructed.
 
@@ -23,8 +23,8 @@
 - Indentation is two spaces, LF line endings, `kebab-case` filenames for modules, `camelCase` for identifiers. Maintain ASCII unless the file already uses Unicode.
 - Keep comments purposeful; avoid restating the obvious. Add brief context only for non-trivial flows (e.g., token refresh sequencing).
 
-## Supabase & Secrets Handling
-- Read `SUPABASE_URL` and `SUPABASE_ANON_KEY` from environment variables or `.env`; never hardcode credentials.
+## Listee API & Secrets Handling
+- Read `LISTEE_API_URL` from environment variables or `.env`; never hardcode endpoints or secrets.
 - Keytar service name defaults to `listee-cli`. If a feature demands overrides, surface them via env vars or CLI flags.
 
 ## Safety & Review Protocol

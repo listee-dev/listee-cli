@@ -5,7 +5,7 @@ import { createInterface } from "node:readline";
 import type { Command } from "commander";
 import {
   completeSignupFromFragment,
-  ensureSupabaseConfig,
+  ensureListeeApiConfig,
   login,
   logout,
   signup,
@@ -32,6 +32,10 @@ const ensureEmail = (value: unknown): string => {
   }
 
   return ensureNonEmpty(value, "Email");
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null;
 };
 
 const handleError = (error: unknown): void => {
@@ -138,7 +142,10 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
           return;
         }
         try {
-          const parsed = JSON.parse(data) as { hash?: string };
+          const parsed = JSON.parse(data);
+          if (!isRecord(parsed)) {
+            throw new Error("Invalid request body received.");
+          }
           const hash = parsed.hash;
           if (typeof hash !== "string" || hash.length === 0) {
             throw new Error("Missing hash in request body.");
@@ -181,11 +188,12 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
   });
 
   const address = server.address();
-  if (
-    address === null ||
-    typeof address !== "object" ||
-    address.port === undefined
-  ) {
+  if (address === null || typeof address === "string") {
+    server.close();
+    throw new Error("Failed to determine loopback server port.");
+  }
+  const { port } = address;
+  if (port === undefined) {
     server.close();
     throw new Error("Failed to determine loopback server port.");
   }
@@ -210,7 +218,7 @@ const startLoopbackServer = async (): Promise<LoopbackServer> => {
   };
 
   return {
-    redirectUrl: `http://${LOOPBACK_HOST}:${address.port}/callback`,
+    redirectUrl: `http://${LOOPBACK_HOST}:${port}/callback`,
     waitForConfirmation: () =>
       waitForConfirmation.finally(() => clearTimeout(timeout)),
     shutdown,
@@ -331,7 +339,7 @@ const printStatus = (result: AuthStatus): void => {
 };
 
 const loginAction = async (options: EmailOption): Promise<void> => {
-  ensureSupabaseConfig();
+  ensureListeeApiConfig();
   const email = ensureEmail(options.email);
   const password = await promptHiddenInput("Password: ");
   await login(email, password);
@@ -339,7 +347,7 @@ const loginAction = async (options: EmailOption): Promise<void> => {
 };
 
 const signupAction = async (options: EmailOption): Promise<void> => {
-  ensureSupabaseConfig();
+  ensureListeeApiConfig();
   const email = ensureEmail(options.email);
   const password = await promptHiddenInput("Password: ");
   const loopback = await startLoopbackServer();
@@ -385,13 +393,11 @@ const statusAction = async (): Promise<void> => {
 export const registerAuthCommand = (program: Command): void => {
   const auth = program
     .command("auth")
-    .description("Manage Supabase authentication for Listee.");
+    .description("Manage Listee API authentication for Listee.");
 
   auth
     .command("signup")
-    .description(
-      "Sign up for a new Listee account via Supabase email/password.",
-    )
+    .description("Sign up for a new Listee account via the Listee API.")
     .requiredOption("--email <email>", "Email address to register")
     .action(
       execute(async (options: EmailOption) => {
@@ -402,7 +408,7 @@ export const registerAuthCommand = (program: Command): void => {
   auth
     .command("login")
     .description(
-      "Authenticate with Supabase using email/password and store refresh token in keychain.",
+      "Authenticate with the Listee API using email/password and store refresh token in keychain.",
     )
     .requiredOption("--email <email>", "Email address to log in")
     .action(

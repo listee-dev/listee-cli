@@ -3,16 +3,21 @@ import {
   type AccountProvisioner,
   createAccountProvisioner,
 } from "@listee/auth";
-import type { SupabaseToken } from "@listee/types";
 import { AsyncEntry, findCredentials } from "@napi-rs/keyring";
+import { checkEnv, getEnv } from "../env.js";
 import type {
   AccessTokenResult,
   AuthStatus,
+  AuthTokenClaims,
+  AuthTokenResponse,
   SignupRedirect,
   StoredCredential,
-  SupabaseErrorPayload,
-  SupabaseTokenResponse,
 } from "../types/auth.js";
+import {
+  buildListeeApiUrl,
+  extractApiErrorMessage,
+  readApiPayload,
+} from "./api-base.js";
 
 const DEFAULT_SERVICE_NAME = "listee-cli";
 let cachedAccountProvisioner: AccountProvisioner | null = null;
@@ -36,34 +41,15 @@ const isNumber = (value: unknown): value is number => {
   return typeof value === "number" && Number.isFinite(value);
 };
 
-const isSupabaseErrorPayload = (
-  value: unknown,
-): value is SupabaseErrorPayload => {
+const isAuthTokenResponse = (value: unknown): value is AuthTokenResponse => {
   if (!isRecord(value)) {
     return false;
   }
 
-  const possibleFields = [
-    "error",
-    "error_description",
-    "msg",
-    "message",
-    "status",
-  ];
-  return possibleFields.some((field) => field in value);
-};
-
-const isSupabaseTokenResponse = (
-  value: unknown,
-): value is SupabaseTokenResponse => {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  const accessToken = value.access_token;
-  const refreshToken = value.refresh_token;
-  const tokenType = value.token_type;
-  const expiresIn = value.expires_in;
+  const accessToken = value.accessToken;
+  const refreshToken = value.refreshToken;
+  const tokenType = value.tokenType;
+  const expiresIn = value.expiresIn;
 
   return (
     isString(accessToken) &&
@@ -93,90 +79,63 @@ const listStoredCredentials = (service: string): StoredCredential[] => {
   }
 };
 
-const getSupabaseUrl = (): URL => {
-  const rawUrl = process.env.SUPABASE_URL;
-  if (rawUrl === undefined || rawUrl.trim().length === 0) {
-    throw new Error(
-      "SUPABASE_URL is not set. Please configure the environment variable before continuing.",
-    );
-  }
-
-  return new URL(rawUrl.trim());
-};
-
-const getSupabasePublishableKey = (): string => {
-  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (publishableKey !== undefined && publishableKey.trim().length > 0) {
-    return publishableKey.trim();
-  }
-
-  const legacyAnonKey = process.env.SUPABASE_ANON_KEY;
-  if (legacyAnonKey !== undefined && legacyAnonKey.trim().length > 0) {
-    return legacyAnonKey.trim();
-  }
-
-  throw new Error(
-    "SUPABASE_PUBLISHABLE_KEY is not set. Please configure the environment variable before continuing.",
-  );
-};
-
-export const ensureSupabaseConfig = (): void => {
-  void getSupabaseUrl();
-  void getSupabasePublishableKey();
+export const ensureListeeApiConfig = (): void => {
+  checkEnv();
+  void getEnv().LISTEE_API_URL;
 };
 
 const getKeychainServiceName = (): string => {
-  const override = process.env.LISTEE_CLI_KEYCHAIN_SERVICE;
-  if (override !== undefined && override.trim().length > 0) {
-    return override.trim();
-  }
-
-  return DEFAULT_SERVICE_NAME;
+  const env = getEnv();
+  return env.LISTEE_CLI_KEYCHAIN_SERVICE ?? DEFAULT_SERVICE_NAME;
 };
 
-const readJson = async (response: Response): Promise<unknown> => {
-  const raw = await response.text();
-  if (raw.trim().length === 0) {
-    return null;
-  }
+type AuthRequestBody = Record<string, unknown>;
 
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to parse Supabase response: ${error.message}`);
+const requestAuthJson = async (
+  path: string,
+  body: AuthRequestBody,
+): Promise<unknown> => {
+  const url = buildListeeApiUrl(path);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await readApiPayload(response);
+  if (response.ok) {
+    if (payload.type === "json") {
+      return payload.body;
+    }
+    if (payload.type === "empty") {
+      return null;
     }
     throw new Error(
-      "Failed to parse Supabase response due to an unknown error.",
+      `Listee API auth request expected JSON or empty response but received ${payload.type}`,
     );
   }
+
+  const message = extractApiErrorMessage(payload, `status ${response.status}`);
+  throw new Error(`Listee API auth request failed: ${message}`);
 };
 
-const formatSupabaseError = (payload: unknown, status: number): string => {
-  if (isSupabaseErrorPayload(payload)) {
-    const { error, error_description: description, msg, message } = payload;
-    const details = [error, description, msg, message]
-      .filter(
-        (part) =>
-          part !== undefined && isString(part) && part.trim().length > 0,
-      )
-      .join(": ");
-
-    if (details.length > 0) {
-      return details;
-    }
+const toAuthTokenResponse = (payload: unknown): AuthTokenResponse => {
+  if (isAuthTokenResponse(payload)) {
+    return payload;
   }
 
-  return `Supabase request failed with status ${status}`;
-};
+  if (
+    isRecord(payload) &&
+    "data" in payload &&
+    isAuthTokenResponse((payload as { data: unknown }).data)
+  ) {
+    return (payload as { data: AuthTokenResponse }).data;
+  }
 
-const buildSupabaseHeaders = (): Record<string, string> => {
-  const publishableKey = getSupabasePublishableKey();
-  return {
-    "Content-Type": "application/json",
-    apikey: publishableKey,
-    Authorization: `Bearer ${publishableKey}`,
-  };
+  throw new Error("Listee API auth response did not include token details.");
 };
 
 const getFragmentParams = (fragment: string): URLSearchParams => {
@@ -208,7 +167,7 @@ const decodeJwtPayload = (token: string): unknown => {
   }
 };
 
-const isSupabaseTokenPayload = (payload: unknown): payload is SupabaseToken => {
+const isAuthTokenPayload = (payload: unknown): payload is AuthTokenClaims => {
   if (!isRecord(payload)) {
     return false;
   }
@@ -239,16 +198,16 @@ const isSupabaseTokenPayload = (payload: unknown): payload is SupabaseToken => {
   return true;
 };
 
-const decodeSupabaseToken = (token: string): SupabaseToken => {
+const decodeAuthToken = (token: string): AuthTokenClaims => {
   const payload = decodeJwtPayload(token);
-  if (!isSupabaseTokenPayload(payload)) {
+  if (!isAuthTokenPayload(payload)) {
     throw new Error("Access token payload structure is invalid.");
   }
 
   return payload;
 };
 
-const extractSubjectFromTokenPayload = (payload: SupabaseToken): string => {
+const extractSubjectFromTokenPayload = (payload: AuthTokenClaims): string => {
   const subjectValue = payload.sub;
   if (!isString(subjectValue) || subjectValue.trim().length === 0) {
     throw new Error("Access token payload did not include a user id.");
@@ -258,7 +217,7 @@ const extractSubjectFromTokenPayload = (payload: SupabaseToken): string => {
 };
 
 const extractEmailFromAccessToken = (token: string): string => {
-  const payload = decodeSupabaseToken(token);
+  const payload = decodeAuthToken(token);
   const email = payload.email;
   if (!isString(email) || email.trim().length === 0) {
     throw new Error("Access token payload did not include an email.");
@@ -364,59 +323,37 @@ const deleteAllStoredCredentials = async (): Promise<number> => {
   return removed;
 };
 
-const requestSupabase = async (
-  path: string,
-  body: Record<string, unknown>,
-): Promise<Response> => {
-  const url = new URL(path, getSupabaseUrl());
-  return fetch(url, {
-    method: "POST",
-    headers: buildSupabaseHeaders(),
-    body: JSON.stringify(body),
-  });
-};
-
 export const signup = async (
   email: string,
   password: string,
   redirectUrl?: string,
 ): Promise<void> => {
-  const path =
-    redirectUrl === undefined
-      ? "auth/v1/signup"
-      : `auth/v1/signup?redirect_to=${encodeURIComponent(redirectUrl)}`;
-  const response = await requestSupabase(path, { email, password });
-
-  if (!response.ok) {
-    const payload = await readJson(response);
-    throw new Error(formatSupabaseError(payload, response.status));
+  const requestBody: AuthRequestBody = {
+    email,
+    password,
+  };
+  if (redirectUrl !== undefined) {
+    requestBody.redirectUrl = redirectUrl;
   }
+  await requestAuthJson("/auth/signup", requestBody);
 };
 
 export const login = async (
   email: string,
   password: string,
 ): Promise<AccessTokenResult> => {
-  const response = await requestSupabase("auth/v1/token?grant_type=password", {
+  const payload = await requestAuthJson("/auth/login", {
     email,
     password,
   });
+  const tokenResponse = toAuthTokenResponse(payload);
 
-  const payload = await readJson(response);
-  if (!response.ok) {
-    throw new Error(formatSupabaseError(payload, response.status));
-  }
-
-  if (!isSupabaseTokenResponse(payload)) {
-    throw new Error("Unexpected response from Supabase during login.");
-  }
-
-  await storeRefreshToken(email, payload.refresh_token);
+  await storeRefreshToken(email, tokenResponse.refreshToken);
 
   return {
-    accessToken: payload.access_token,
-    expiresIn: payload.expires_in,
-    tokenType: payload.token_type,
+    accessToken: tokenResponse.accessToken,
+    expiresIn: tokenResponse.expiresIn,
+    tokenType: tokenResponse.tokenType,
   };
 };
 
@@ -428,31 +365,49 @@ export const getAccessToken = async (
     throw new Error("No stored refresh token found. Please log in first.");
   }
 
-  const response = await requestSupabase(
-    "auth/v1/token?grant_type=refresh_token",
-    {
-      refresh_token: credential.refreshToken,
-    },
-  );
+  const payload = await requestAuthJson("/auth/token", {
+    refreshToken: credential.refreshToken,
+  });
+  const tokenResponse = toAuthTokenResponse(payload);
 
-  const payload = await readJson(response);
-  if (!response.ok) {
-    throw new Error(formatSupabaseError(payload, response.status));
-  }
-
-  if (!isSupabaseTokenResponse(payload)) {
-    throw new Error(
-      "Unexpected response from Supabase while refreshing the session.",
-    );
-  }
-
-  await storeRefreshToken(credential.account, payload.refresh_token);
+  await storeRefreshToken(credential.account, tokenResponse.refreshToken);
 
   return {
-    accessToken: payload.access_token,
-    expiresIn: payload.expires_in,
-    tokenType: payload.token_type,
+    accessToken: tokenResponse.accessToken,
+    expiresIn: tokenResponse.expiresIn,
+    tokenType: tokenResponse.tokenType,
   };
+};
+
+export type AuthenticatedAccessTokenResult = AccessTokenResult & {
+  userId: string;
+  token: AuthTokenClaims;
+};
+
+export const toAuthenticatedAccessTokenResult = (
+  tokenResult: AccessTokenResult,
+): AuthenticatedAccessTokenResult => {
+  const accessToken = tokenResult.accessToken.trim();
+  if (accessToken.length === 0) {
+    throw new Error("Access token is empty.");
+  }
+
+  const token = decodeAuthToken(accessToken);
+  const userId = extractSubjectFromTokenPayload(token);
+
+  return {
+    ...tokenResult,
+    accessToken,
+    userId,
+    token,
+  };
+};
+
+export const getAuthenticatedAccessToken = async (
+  email?: string,
+): Promise<AuthenticatedAccessTokenResult> => {
+  const tokenResult = await getAccessToken(email);
+  return toAuthenticatedAccessTokenResult(tokenResult);
 };
 
 export const logout = async (): Promise<number> => {
@@ -485,7 +440,7 @@ export const completeSignupFromFragment = async (
 const provisionSignupAccount = async (
   result: SignupRedirect,
 ): Promise<void> => {
-  const tokenPayload = decodeSupabaseToken(result.accessToken);
+  const tokenPayload = decodeAuthToken(result.accessToken);
   const userId = extractSubjectFromTokenPayload(tokenPayload);
   const provisioner = getAccountProvisioner();
 

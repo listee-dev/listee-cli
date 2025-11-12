@@ -4,11 +4,13 @@
     "": {
       "name": "listee-cli",
       "dependencies": {
-        "@listee/auth": "^0.2.3",
-        "@listee/types": "^0.2.3",
+        "@listee/auth": "^0.4.0",
+        "@listee/types": "^0.4.0",
         "@napi-rs/keyring": "^1.2.0",
+        "@t3-oss/env-core": "^0.13.8",
         "commander": "^12.1.0",
         "dotenv": "^16.4.5",
+        "zod": "^4.1.12",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.2.4",
@@ -37,11 +39,11 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.2.5", "", { "os": "win32", "cpu": "x64" }, "sha512-F/jhuXCssPFAuciMhHKk00xnCAxJRS/pUzVfXYmOMUp//XW7mO6QeCjsjvnm8L4AO/dG2VOB0O+fJPiJ2uXtIw=="],
 
-    "@listee/auth": ["@listee/auth@0.2.3", "", { "dependencies": { "@listee/db": "^0.2.3", "@listee/types": "^0.2.3", "jose": "^5.2.3" } }, "sha512-uKWmlxL1wji+/qILopv1iOc8G98fpBhmpTTAc7CgtaNK3bXdrbsKSQCNKUXxu9Q5bPsdWNcbLP1AyYznwEE9wQ=="],
+    "@listee/auth": ["@listee/auth@0.4.0", "", { "dependencies": { "@listee/db": "^0.4.0", "@listee/types": "^0.4.0", "jose": "^5.2.3" } }, "sha512-Er3L7k1br6b/3ROLVrnI4xUzGeJMtpQdy2py9qd7d7S8SpBcZwUa1mejwfjACwrk2t/WyUNnhHF/Kgsk137q3Q=="],
 
-    "@listee/db": ["@listee/db@0.2.3", "", { "dependencies": { "drizzle-orm": "^0.44.5", "postgres": "^3.4.7" } }, "sha512-RNijZvSbavrMITk+mKUwPon2XwcbxVYiQSLWPfrv83g+B3JpG1ClYId4qk21cJkUVH6Hn6O97rXN1XOQSKdKNw=="],
+    "@listee/db": ["@listee/db@0.4.0", "", { "dependencies": { "drizzle-orm": "^0.44.5", "postgres": "^3.4.7" } }, "sha512-6WOSt6UZy+fX2TnsrLl812P9NdWPocCGrOzN6kVnfdR61rbh2OE8k6KPC3cXnGzbamIQBueeut8v66ho0lHsiw=="],
 
-    "@listee/types": ["@listee/types@0.2.3", "", { "dependencies": { "@listee/db": "^0.2.3" } }, "sha512-eGOVIn4nCTIWuIC8fu07vjbBf14UU8DQKJQCQOpJjFjW7YP4hCUdjc64DhtYjlsK56xi/TiJprVw7MrpJfx4FA=="],
+    "@listee/types": ["@listee/types@0.4.0", "", { "dependencies": { "@listee/db": "^0.4.0" } }, "sha512-UmQjgCGu23ebgHoP3zYknEDirASRADguKJleEsrU/XwBSfxb7xSyAmIz7Erf1vSjYY+qj35LnoydOk4mSdYHNQ=="],
 
     "@napi-rs/keyring": ["@napi-rs/keyring@1.2.0", "", { "optionalDependencies": { "@napi-rs/keyring-darwin-arm64": "1.2.0", "@napi-rs/keyring-darwin-x64": "1.2.0", "@napi-rs/keyring-freebsd-x64": "1.2.0", "@napi-rs/keyring-linux-arm-gnueabihf": "1.2.0", "@napi-rs/keyring-linux-arm64-gnu": "1.2.0", "@napi-rs/keyring-linux-arm64-musl": "1.2.0", "@napi-rs/keyring-linux-riscv64-gnu": "1.2.0", "@napi-rs/keyring-linux-x64-gnu": "1.2.0", "@napi-rs/keyring-linux-x64-musl": "1.2.0", "@napi-rs/keyring-win32-arm64-msvc": "1.2.0", "@napi-rs/keyring-win32-ia32-msvc": "1.2.0", "@napi-rs/keyring-win32-x64-msvc": "1.2.0" } }, "sha512-d0d4Oyxm+v980PEq1ZH2PmS6cvpMIRc17eYpiU47KgW+lzxklMu6+HOEOPmxrpnF/XQZ0+Q78I2mgMhbIIo/dg=="],
 
@@ -69,6 +71,8 @@
 
     "@napi-rs/keyring-win32-x64-msvc": ["@napi-rs/keyring-win32-x64-msvc@1.2.0", "", { "os": "win32", "cpu": "x64" }, "sha512-xFlx/TsmqmCwNU9v+AVnEJgoEAlBYgzFF5Ihz1rMpPAt4qQWWkMd4sCyM1gMJ1A/GnRqRegDiQpwaxGUHFtFbA=="],
 
+    "@t3-oss/env-core": ["@t3-oss/env-core@0.13.8", "", { "peerDependencies": { "arktype": "^2.1.0", "typescript": ">=5.0.0", "valibot": "^1.0.0-beta.7 || ^1.0.0", "zod": "^3.24.0 || ^4.0.0-beta.0" }, "optionalPeers": ["arktype", "typescript", "valibot", "zod"] }, "sha512-L1inmpzLQyYu4+Q1DyrXsGJYCXbtXjC4cICw1uAKv0ppYPQv656lhZPU91Qd1VS6SO/bou1/q5ufVzBGbNsUpw=="],
+
     "@types/bun": ["@types/bun@1.2.23", "", { "dependencies": { "bun-types": "1.2.23" } }, "sha512-le8ueOY5b6VKYf19xT3McVbXqLqmxzPXHsQT/q9JHgikJ2X22wyTW3g3ohz2ZMnp7dod6aduIiq8A14Xyimm0A=="],
 
     "@types/node": ["@types/node@20.19.19", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-pb1Uqj5WJP7wrcbLU7Ru4QtA0+3kAXrkutGiD26wUKzSMgNNaPARTUDQmElUXp64kh3cWdou3Q0C7qwwxqSFmg=="],
@@ -92,5 +96,7 @@
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
+
+    "zod": ["zod@4.1.12", "", {}, "sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ=="],
   }
 }

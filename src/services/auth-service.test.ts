@@ -1,53 +1,40 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { Buffer } from "node:buffer";
+import { resetEnvCache } from "../env.js";
 import {
   type AccessTokenResult,
-  ensureSupabaseConfig,
+  ensureListeeApiConfig,
   parseSignupFragment,
+  toAuthenticatedAccessTokenResult,
 } from "./auth-service.js";
 
 const ORIGINAL_ENV = { ...process.env };
 
+if (ORIGINAL_ENV.LISTEE_API_URL === undefined) {
+  ORIGINAL_ENV.LISTEE_API_URL = "https://api.example.dev";
+}
+
 const resetEnv = (): void => {
   process.env = { ...ORIGINAL_ENV };
+  resetEnvCache();
 };
 
 beforeEach(resetEnv);
 afterEach(resetEnv);
 
-describe("ensureSupabaseConfig", () => {
-  it("throws when SUPABASE_URL is missing", () => {
-    delete process.env.SUPABASE_URL;
-    process.env.SUPABASE_PUBLISHABLE_KEY = "pk_test";
+describe("ensureListeeApiConfig", () => {
+  it("throws when LISTEE_API_URL is missing", () => {
+    delete process.env.LISTEE_API_URL;
 
     expect(() => {
-      ensureSupabaseConfig();
-    }).toThrow("SUPABASE_URL is not set");
+      ensureListeeApiConfig();
+    }).toThrow("LISTEE_API_URL is not set");
   });
 
-  it("throws when publishable key and legacy anon key are missing", () => {
-    process.env.SUPABASE_URL = "https://example.supabase.co";
-    delete process.env.SUPABASE_PUBLISHABLE_KEY;
-    delete process.env.SUPABASE_ANON_KEY;
+  it("does not throw when LISTEE_API_URL is set", () => {
+    process.env.LISTEE_API_URL = "https://api.example.dev";
 
-    expect(() => {
-      ensureSupabaseConfig();
-    }).toThrow("SUPABASE_PUBLISHABLE_KEY is not set");
-  });
-
-  it("does not throw when publishable key is set", () => {
-    process.env.SUPABASE_URL = "https://example.supabase.co";
-    process.env.SUPABASE_PUBLISHABLE_KEY = "pk_test";
-
-    expect(() => ensureSupabaseConfig()).not.toThrow();
-  });
-
-  it("allows fallback to legacy anon key", () => {
-    process.env.SUPABASE_URL = "https://example.supabase.co";
-    delete process.env.SUPABASE_PUBLISHABLE_KEY;
-    process.env.SUPABASE_ANON_KEY = "anon_key";
-
-    expect(() => ensureSupabaseConfig()).not.toThrow();
+    expect(() => ensureListeeApiConfig()).not.toThrow();
   });
 });
 
@@ -95,5 +82,66 @@ describe("parseSignupFragment", () => {
     expect(() => {
       parseSignupFragment(fragment);
     }).toThrow("Confirmation URL is missing access_token.");
+  });
+});
+
+describe("toAuthenticatedAccessTokenResult", () => {
+  const encodeSegment = (value: unknown): string => {
+    return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+  };
+
+  const header = encodeSegment({ alg: "ES256", typ: "JWT" });
+
+  const buildToken = (payload: Record<string, unknown>): string => {
+    const payloadSegment = encodeSegment(payload);
+    const signature = encodeSegment({ sig: "signature" });
+    return `${header}.${payloadSegment}.${signature}`;
+  };
+
+  it("returns enriched access token details when payload is valid", () => {
+    const epoch = Math.floor(Date.now() / 1000);
+    const payload = {
+      sub: "user-123",
+      email: "user@example.com",
+      iss: "https://example.supabase.co/auth/v1",
+      aud: "authenticated",
+      role: "authenticated",
+      exp: epoch + 3600,
+      iat: epoch,
+    };
+    const accessToken = buildToken(payload);
+    const input: AccessTokenResult = {
+      accessToken,
+      expiresIn: 3600,
+      tokenType: "bearer",
+    };
+
+    const result = toAuthenticatedAccessTokenResult(input);
+
+    expect(result.userId).toBe("user-123");
+    expect(result.token.email).toBe("user@example.com");
+    expect(result.accessToken).toBe(accessToken);
+  });
+
+  it("throws when the JWT payload is missing required subject", () => {
+    const epoch = Math.floor(Date.now() / 1000);
+    const payload = {
+      email: "user@example.com",
+      iss: "https://example.supabase.co/auth/v1",
+      aud: "authenticated",
+      role: "authenticated",
+      exp: epoch + 3600,
+      iat: epoch,
+    };
+    const accessToken = buildToken(payload);
+    const input: AccessTokenResult = {
+      accessToken,
+      expiresIn: 3600,
+      tokenType: "bearer",
+    };
+
+    expect(() => {
+      toAuthenticatedAccessTokenResult(input);
+    }).toThrow("Access token payload structure is invalid.");
   });
 });

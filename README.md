@@ -1,11 +1,11 @@
 # listee-cli
 
-Official command-line interface for Listee — manage authentication, categories, and tasks directly from your terminal. The MVP focuses on Supabase email/password flows (`signup`, `login`, `logout`, `status`).
+Official command-line interface for Listee — manage authentication, categories, and tasks directly from your terminal via the Listee API (`signup`, `login`, `logout`, `status`).
 
 ## Requirements
 - Bun 1.2.22 (`bun --version`)
 - Node.js 20+ (runtime for the compiled CLI)
-- Supabase project credentials (`SUPABASE_URL`, `SUPABASE_ANON_KEY`)
+- Listee API base URL (`LISTEE_API_URL`)
 
 ## Installation
 ```bash
@@ -15,8 +15,7 @@ bun install
 ## Configuration
 Create a `.env` file or export environment variables before running commands:
 ```bash
-export SUPABASE_URL="https://your-project.supabase.co"
-export SUPABASE_ANON_KEY="your-anon-key"
+export LISTEE_API_URL="https://api.your-listee-instance.dev"
 # optional: override the Keytar service name
 export LISTEE_CLI_KEYCHAIN_SERVICE="listee-cli"
 ```
@@ -32,6 +31,16 @@ listee auth signup --email you@example.com
 listee auth login --email you@example.com
 listee auth status
 listee auth logout
+listee categories list [--email you@example.com]
+listee categories show <categoryId> [--email you@example.com]
+listee categories create --name "Inbox" [--email you@example.com]
+listee categories update <categoryId> --name "New name" [--email you@example.com]
+listee categories delete <categoryId> [--email you@example.com]
+listee tasks list --category <categoryId> [--email you@example.com]
+listee tasks create --category <categoryId> --name "Task title" [--description "..."] [--checked] [--email you@example.com]
+listee tasks show <taskId> [--email you@example.com]
+listee tasks update <taskId> [--name "New title"] [--description "..."] [--clear-description] [--checked|--unchecked] [--email you@example.com]
+listee tasks delete <taskId> [--email you@example.com]
 ```
 
 `listee auth signup` starts a temporary local callback server. Leave the command running, open the confirmation email, and the CLI will finish automatically once the browser redirects back to the loopback URL.
@@ -49,7 +58,12 @@ listee auth logout
 src/
   index.ts          # CLI entrypoint (Commander wiring)
   commands/auth.ts  # Auth subcommands
+  commands/categories.ts
+  commands/tasks.ts
   services/auth-service.ts
+  services/api-client.ts
+  services/category-api.ts
+  services/task-api.ts
 AGENTS.md           # Agent-specific automation guidelines
 ```
 
