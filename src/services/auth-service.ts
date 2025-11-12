@@ -106,21 +106,20 @@ const requestAuthJson = async (
   });
 
   const payload = await readApiPayload(response);
-  if (!response.ok) {
-    const message = extractApiErrorMessage(
-      payload,
-      `status ${response.status}`,
-    );
-    throw new Error(`Listee API auth request failed: ${message}`);
-  }
-
-  if (payload.type !== "json") {
+  if (response.ok) {
+    if (payload.type === "json") {
+      return payload.body;
+    }
+    if (payload.type === "empty") {
+      return null;
+    }
     throw new Error(
-      `Listee API auth request expected JSON but received ${payload.type}`,
+      `Listee API auth request expected JSON or empty response but received ${payload.type}`,
     );
   }
 
-  return payload.body;
+  const message = extractApiErrorMessage(payload, `status ${response.status}`);
+  throw new Error(`Listee API auth request failed: ${message}`);
 };
 
 const toAuthTokenResponse = (payload: unknown): AuthTokenResponse => {
