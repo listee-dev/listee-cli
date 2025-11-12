@@ -127,9 +127,10 @@ export const registerCategoryCommand = (program: Command): void => {
     .action(
       execute(
         async (categoryId: string, options: { readonly email?: string }) => {
+          const id = ensureNonEmptyString(categoryId, "Category ID");
           const response = await getCategory({
             email: options.email,
-            categoryId,
+            categoryId: id,
           });
           printCategoryDetails(response.data);
         },

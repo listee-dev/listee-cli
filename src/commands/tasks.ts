@@ -93,8 +93,9 @@ export const registerTaskCommand = (program: Command): void => {
           readonly category: string;
           readonly email?: string;
         }) => {
+          const categoryId = ensureNonEmptyString(options.category, "Category");
           const response = await listTasksByCategory({
-            categoryId: options.category,
+            categoryId,
             email: options.email,
           });
           printTasks(response.data);
@@ -108,7 +109,8 @@ export const registerTaskCommand = (program: Command): void => {
     .option("--email <email>", "Account email to use when fetching the task")
     .action(
       execute(async (taskId: string, options: { readonly email?: string }) => {
-        const response = await getTask({ taskId, email: options.email });
+        const id = ensureNonEmptyString(taskId, "Task ID");
+        const response = await getTask({ taskId: id, email: options.email });
         printTaskDetails(response.data);
       }),
     );
